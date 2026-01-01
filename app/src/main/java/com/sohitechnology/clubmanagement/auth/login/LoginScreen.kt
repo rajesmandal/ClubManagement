@@ -35,8 +35,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.sohitechnology.clubmanagement.auth.login.LoginEvent
-import com.sohitechnology.clubmanagement.auth.login.LoginViewModel
 import com.sohitechnology.clubmanagement.ui.theme.ClubManagementTheme
 
 @Composable
