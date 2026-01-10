@@ -83,4 +83,19 @@ dependencies {
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)
 
+    // Retrofit
+    implementation(libs.retrofit.core)
+    implementation(libs.retrofit.gson)
+
+    // OkHttp
+    implementation(libs.okhttp.core)
+    implementation(libs.okhttp.logging)
+
+    // Gson (optional, but useful for manual parsing)
+    implementation(libs.gson)
+
+    // DataStore
+    implementation(libs.datastore.preferences)
+
+
 }

@@ -21,7 +21,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,27 +28,36 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.sohitechnology.clubmanagement.ui.CenterPopup
 import com.sohitechnology.clubmanagement.ui.theme.ClubManagementTheme
 
 @Composable
 fun LoginScreen(
-    viewModel: LoginViewModel = hiltViewModel(),
-    onLoginSuccess: () -> Unit
+    viewModel: LoginViewModel = hiltViewModel()
 ){
     val state by viewModel.state.collectAsState()
-    var passwordVisible by remember { mutableStateOf(false) }
 
-    LaunchedEffect(state.successMessage) {
-        if (state.successMessage != null) {
-            onLoginSuccess()
-        }
-    }
+    LoginScreenContent(
+        state = state,
+        onEvent = viewModel::onEvent,
+        clearUiMessage = viewModel::clearUiMessage
+    )
+}
+
+@Composable
+fun LoginScreenContent(
+    state: LoginState,
+    onEvent: (LoginEvent) -> Unit,
+    clearUiMessage: () -> Unit
+) {
+    var passwordVisible by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -73,25 +81,52 @@ fun LoginScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(8.dp))
-            // Email / Username
+
+            // Company Id
             OutlinedTextField(
-                value = state.email,
+                value = state.companyId,
                 onValueChange = {
-                    viewModel.onEvent(LoginEvent.EmailChanged(it))
+                    onEvent(LoginEvent.CompanyIdChanged(it))
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Email or Username") },
+                label = { Text("Company Id") },
                 singleLine = true,
-                isError = state.emailError != null,
+                isError = state.companyIdError != null,
                 keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Email
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Next
+                )
+            )
+
+            // Company Id error text
+            if (state.companyIdError != null) {
+                Text(
+                    text = state.companyIdError,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            // Email / Username
+            OutlinedTextField(
+                value = state.username,
+                onValueChange = {
+                    onEvent(LoginEvent.EmailChanged(it))
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Username") },
+                singleLine = true,
+                isError = state.usernameError != null,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Next
                 )
             )
 
             // Email error text
-            if (state.emailError != null) {
+            if (state.usernameError != null) {
                 Text(
-                    text = state.emailError!!,
+                    text = state.usernameError!!,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -101,7 +136,7 @@ fun LoginScreen(
             OutlinedTextField(
                 value = state.password,
                 onValueChange = {
-                    viewModel.onEvent(LoginEvent.PasswordChanged(it))
+                    onEvent(LoginEvent.PasswordChanged(it))
                 },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Password") },
@@ -111,7 +146,8 @@ fun LoginScreen(
                 else
                     PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done
                 ),
                 trailingIcon = {
                     IconButton(onClick = {
@@ -143,7 +179,7 @@ fun LoginScreen(
             // Login Button
             Button(
                 onClick = {
-                    viewModel.onEvent(LoginEvent.LoginClicked)
+                    onEvent(LoginEvent.LoginClicked)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -164,24 +200,28 @@ fun LoginScreen(
                 }
             }
 
-            //Success message show
-            if (state.successMessage != null) {
-                Text(
-                    text = state.successMessage!!,
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodyMedium
+            //Error Message Show
+            state.uiMessage?.let { message ->
+                CenterPopup(
+                    uiMessage = message,
+                    onDismiss = {
+                        clearUiMessage()
+                    }
                 )
             }
 
         }
     }
-
 }
 
 @Preview(showBackground = true)
 @Composable
 fun LoginScreenPreview() {
     ClubManagementTheme(darkTheme = false) {
-        LoginScreen(onLoginSuccess = {})
+        LoginScreenContent(
+            state = LoginState(companyId = "123456", username = "test@example.com"), // Dummy state
+            onEvent = {},
+            clearUiMessage = {}
+        )
     }
 }
