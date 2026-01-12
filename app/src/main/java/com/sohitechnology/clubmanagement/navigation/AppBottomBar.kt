@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 
@@ -43,8 +44,12 @@ fun AppBottomBar(navController: NavHostController) {
                 selected = selected,
                 onClick = {
                     navController.navigate(item.route) {
-                        popUpTo(MainRoute.Home.route)
+                        // Hamesha graph ke start destination tak pop karein
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
                         launchSingleTop = true
+                        restoreState = true
                     }
                 },
                 icon = {

@@ -7,6 +7,7 @@ import com.sohitechnology.clubmanagement.core.NavigationManager
 import com.sohitechnology.clubmanagement.core.session.AppDataStore
 import com.sohitechnology.clubmanagement.core.session.SessionKeys
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -21,7 +22,7 @@ class SplashViewModel @Inject constructor(
 
     private fun decideNavigation() {
         viewModelScope.launch {
-
+            delay(1000) //1 second ka wait
             val isLoggedIn = dataStore.readOnce(
                 SessionKeys.IS_LOGGED_IN,
                 false

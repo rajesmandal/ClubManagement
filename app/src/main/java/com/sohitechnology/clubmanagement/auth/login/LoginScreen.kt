@@ -9,8 +9,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Password
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -35,7 +41,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.sohitechnology.clubmanagement.ui.CenterPopup
+import com.sohitechnology.clubmanagement.ui.common.CenterPopup
 import com.sohitechnology.clubmanagement.ui.theme.ClubManagementTheme
 
 @Composable
@@ -67,7 +73,8 @@ fun LoginScreenContent(
         Column(
             modifier = Modifier
                 .align(Alignment.Center)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
@@ -90,6 +97,11 @@ fun LoginScreenContent(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Company Id") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Business, // Aap Badge ya Apartment bhi use kar sakte hain
+                        contentDescription = null
+                    )},
                 singleLine = true,
                 isError = state.companyIdError != null,
                 keyboardOptions = KeyboardOptions(
@@ -115,6 +127,12 @@ fun LoginScreenContent(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Username") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null
+                    )
+                },
                 singleLine = true,
                 isError = state.usernameError != null,
                 keyboardOptions = KeyboardOptions(
@@ -126,7 +144,7 @@ fun LoginScreenContent(
             // Email error text
             if (state.usernameError != null) {
                 Text(
-                    text = state.usernameError!!,
+                    text = state.usernameError,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -140,6 +158,12 @@ fun LoginScreenContent(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Password") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null
+                    )
+                },
                 singleLine = true,
                 visualTransformation = if (passwordVisible)
                     VisualTransformation.None
@@ -168,7 +192,7 @@ fun LoginScreenContent(
             // Password Error text
             if (state.passwordError != null) {
                 Text(
-                    text = state.passwordError ?: "",
+                    text = state.passwordError,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall
                 )

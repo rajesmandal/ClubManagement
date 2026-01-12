@@ -1,4 +1,4 @@
-package com.sohitechnology.clubmanagement.ui
+package com.sohitechnology.clubmanagement.ui.common
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -23,6 +23,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.sohitechnology.clubmanagement.ui.UiMessage
+import com.sohitechnology.clubmanagement.ui.UiMessageType
 import kotlinx.coroutines.delay
 
 @Composable

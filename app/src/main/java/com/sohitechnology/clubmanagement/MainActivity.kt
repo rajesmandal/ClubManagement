@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.sohitechnology.clubmanagement.core.NavigationEvent
 import com.sohitechnology.clubmanagement.core.NavigationManager
+import com.sohitechnology.clubmanagement.navigation.AuthRoute
 import com.sohitechnology.clubmanagement.navigation.RootNavGraph
 import com.sohitechnology.clubmanagement.navigation.RootRoute
 import com.sohitechnology.clubmanagement.ui.theme.ClubManagementTheme
@@ -42,8 +43,9 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 NavigationEvent.ToLogin -> {
-                                    navController.navigate(RootRoute.Auth.route) {
-                                        popUpTo(0)
+                                    navController.navigate(AuthRoute.Login.route) { // Go back to the Parent Auth Graph
+                                        popUpTo(0) { inclusive = true } // Clear everything to avoid backstack leaks
+                                        launchSingleTop = true
                                     }
                                 }
                             }

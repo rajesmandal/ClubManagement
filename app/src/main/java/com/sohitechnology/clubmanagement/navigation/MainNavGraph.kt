@@ -2,8 +2,8 @@ package com.sohitechnology.clubmanagement.navigation
 
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
-import com.sohitechnology.clubmanagement.ui.MembersScreen
-import com.sohitechnology.clubmanagement.ui.ProfileScreen
+import com.sohitechnology.clubmanagement.ui.member.MembersScreen
+import com.sohitechnology.clubmanagement.ui.profile.ProfileScreen
 import com.sohitechnology.clubmanagement.ui.ReportScreen
 import com.sohitechnology.clubmanagement.ui.home.HomeScreen
 

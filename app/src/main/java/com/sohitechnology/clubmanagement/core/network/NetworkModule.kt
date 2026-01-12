@@ -1,10 +1,13 @@
 package com.sohitechnology.clubmanagement.core.network
 
 import com.google.gson.Gson
+import com.sohitechnology.clubmanagement.core.session.AppDataStore
+import com.sohitechnology.clubmanagement.core.session.SessionKeys
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.runBlocking
 import javax.inject.Singleton
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -22,11 +25,13 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideHeaderInterceptor(): HeaderInterceptor =
+    fun provideHeaderInterceptor( dataStore: AppDataStore): HeaderInterceptor =
         HeaderInterceptor(
             tokenProvider = {
-                // abhi null, later DataStore se token aayega
-                null
+                // DataStore se token
+                runBlocking {
+                    dataStore.readOnce(SessionKeys.TOKEN, "")
+                }
             }
         )
 
