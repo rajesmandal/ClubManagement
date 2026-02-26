@@ -13,7 +13,8 @@ private val LightColors = lightColorScheme(
     surface = LightSurface,
     onPrimary = LightOnPrimary,
     onSurface = LightOnSurface,
-    error = ErrorRed
+    error = ErrorRed,
+    surfaceVariant = LightSurface // Ensuring surfaceVariant matches surface for consistency
 )
 
 private val DarkColors = darkColorScheme(
@@ -23,7 +24,8 @@ private val DarkColors = darkColorScheme(
     surface = DarkSurface,
     onPrimary = DarkOnPrimary,
     onSurface = DarkOnSurface,
-    error = ErrorRed
+    error = ErrorRed,
+    surfaceVariant = DarkSurface // Ensuring surfaceVariant is the premium dark color
 )
 
 @Composable
@@ -38,5 +40,3 @@ fun ClubManagementTheme(
         content = content
     )
 }
-
-

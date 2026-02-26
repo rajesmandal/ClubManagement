@@ -26,7 +26,7 @@ class SplashViewModel @Inject constructor(
             val isLoggedIn = dataStore.readOnce(
                 SessionKeys.IS_LOGGED_IN,
                 false
-            ) // one-time read
+            ) ?: false // one-time read
 
             if (isLoggedIn) {
                 NavigationManager.navigate(

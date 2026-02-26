@@ -1,6 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
+    // alias(libs.plugins.kotlin.android) // Removed for AGP 9.0 compatibility
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
@@ -8,9 +8,7 @@ plugins {
 
 android {
     namespace = "com.sohitechnology.clubmanagement"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.sohitechnology.clubmanagement"
@@ -35,13 +33,15 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
-    }
     buildFeatures {
         compose = true
+    }
+}
+
+// Moved outside the android block to resolve receiver type mismatch in AGP 9.0
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
@@ -97,5 +97,13 @@ dependencies {
     // DataStore
     implementation(libs.datastore.preferences)
 
+    // Coil
+    implementation(libs.coil.compose)
+    implementation(libs.coil.gif)
 
+    // Biometric
+    implementation(libs.androidx.biometric)
+
+    // Process Lifecycle
+    implementation(libs.androidx.lifecycle.process)
 }

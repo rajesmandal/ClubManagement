@@ -8,6 +8,6 @@ data class DropdownItem(
 )
 
 fun ClubDto.toDropdownItem() = DropdownItem(
-    id = id.toInt(),
-    label = name
+    id = id?.toIntOrNull() ?: 0,
+    label = name ?: ""
 )

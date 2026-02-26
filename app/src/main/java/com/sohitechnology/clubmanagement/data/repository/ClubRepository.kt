@@ -34,9 +34,10 @@ class ClubRepository @Inject constructor(
             api.getClubs(ClubRequest(cId))
         }) {
             is ApiResult.Success -> {
+                val dataList = result.data.data ?: emptyList()
                 val list =
                     listOf(DropdownItem(0, "All")) +
-                            result.data.data.map { it.toDropdownItem() }
+                            dataList.map { it.toDropdownItem() }
 
                 ClubCache.clubs = list // save cache
                 emit(ApiResult.Success(list))
@@ -49,4 +50,3 @@ class ClubRepository @Inject constructor(
 
     }.flowOn(Dispatchers.IO)
 }
-

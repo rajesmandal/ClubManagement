@@ -113,14 +113,14 @@ class LoginViewModel @Inject constructor(
                         val response = result.data
                         val data = response.data
 
-                        if (response.success && data != null) {
+                        if (response.success == true && data != null) {
                             saveSession(data)
                             _state.update { it.copy(isLoading = false, successMessage = "Login Successfully") }
                             // login success pe
                             NavigationManager.navigate(NavigationEvent.ToHome)
                         } else {
                             // Agar success false hai ya data null hai
-                            val errorMsg = response.message.ifEmpty { "Unknown Reason" }
+                            val errorMsg = response.message ?: "Unknown Reason"
 
                             _state.update {
                                 it.copy(
@@ -141,7 +141,7 @@ class LoginViewModel @Inject constructor(
                                 isLoading = false,
                                 uiMessage = UiMessage(
                                     title = "Login Failed",
-                                    message = result.message,
+                                    message = result.message ?: "An unknown error occurred",
                                     type = UiMessageType.ERROR
                                 )
                             )
@@ -153,10 +153,16 @@ class LoginViewModel @Inject constructor(
     }
 
     private suspend fun saveSession(data: LoginData) { //after login save details
-        dataStore.save(SessionKeys.TOKEN, data.accessToken) // token
-        dataStore.save(SessionKeys.USER_ID, data.userId) // userid
+        dataStore.save(SessionKeys.TOKEN, data.accessToken ?: "")
+        dataStore.save(SessionKeys.USER_ID, data.userId ?: 0)
         dataStore.save(SessionKeys.IS_LOGGED_IN, true)
-        dataStore.save(SessionKeys.COMPANY_ID, data.cId.toString())
+        dataStore.save(SessionKeys.COMPANY_ID, data.cId?.toString() ?: "")
+        
+        // Save user profile data
+        dataStore.save(SessionKeys.ROLE, data.role ?: "")
+        dataStore.save(SessionKeys.USER_NAME, data.userName ?: "")
+        dataStore.save(SessionKeys.FULL_NAME, data.fullName ?: "")
+        dataStore.save(SessionKeys.PROFILE_IMAGE, data.profileImage ?: "")
     }
 
     fun clearUiMessage() {

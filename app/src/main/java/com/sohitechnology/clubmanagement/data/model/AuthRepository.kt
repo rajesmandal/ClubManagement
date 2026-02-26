@@ -8,7 +8,7 @@ import com.sohitechnology.clubmanagement.core.network.apiFlow
 import com.sohitechnology.clubmanagement.core.session.AppDataStore
 import com.sohitechnology.clubmanagement.core.util.DeviceUtil
 import dagger.hilt.android.qualifiers.ApplicationContext
-import jakarta.inject.Inject
+import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 
 class AuthRepository @Inject constructor(
@@ -21,7 +21,19 @@ class AuthRepository @Inject constructor(
     fun login(request: LoginRequest): Flow<ApiResult<LoginResponse>> {
         return apiFlow(gson) {
             val deviceId = DeviceUtil.getOrCreateDeviceId(context, dataStore)
-            api.login(request.copy(deviceId="string")) // api call //temp
+            api.login(request.copy(deviceId = deviceId))
+        }
+    }
+
+    fun logout(request: LogoutRequest): Flow<ApiResult<LogoutResponse>> {
+        return apiFlow(gson) {
+            api.logout(request)
+        }
+    }
+
+    fun updateCredential(request: CredentialUpdateRequest): Flow<ApiResult<CredentialUpdateResponse>> {
+        return apiFlow(gson) {
+            api.updateCredential(request)
         }
     }
 }

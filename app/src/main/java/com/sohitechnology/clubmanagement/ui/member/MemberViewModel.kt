@@ -5,10 +5,14 @@ import androidx.lifecycle.viewModelScope
 import com.sohitechnology.clubmanagement.core.common.ApiResult
 import com.sohitechnology.clubmanagement.core.session.AppDataStore
 import com.sohitechnology.clubmanagement.core.session.SessionKeys
+import com.sohitechnology.clubmanagement.data.model.AddMemberRequest
 import com.sohitechnology.clubmanagement.data.model.MemberRequest
+import com.sohitechnology.clubmanagement.data.model.UpdateMemberRequest
 import com.sohitechnology.clubmanagement.data.repository.MemberRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -23,8 +27,16 @@ class MemberViewModel @Inject constructor(
     private val _state = MutableStateFlow(MemberState())
     val state = _state.asStateFlow()
 
+    private val _event = MutableSharedFlow<MemberUiEvent>()
+    val event = _event.asSharedFlow()
+
+    private var lastClubId: String = "0"
+    private var lastStatus: Int = 0
+
     fun loadMembers(clubId: String, status: Int, forceRefresh: Boolean) {
-        // Agar forceRefresh false hai aur data pehle se hai, toh return kar jayein
+        lastClubId = clubId
+        lastStatus = status
+        
         if (!forceRefresh && _state.value.members.isNotEmpty()) return
 
         viewModelScope.launch {
@@ -41,11 +53,9 @@ class MemberViewModel @Inject constructor(
                 forceRefresh
             ).collect { result ->
                 when (result) {
-
                     ApiResult.Loading -> {
                         _state.update { it.copy(isLoading = true) }
                     }
-
                     is ApiResult.Success -> {
                         _state.update {
                             it.copy(
@@ -54,7 +64,6 @@ class MemberViewModel @Inject constructor(
                             )
                         }
                     }
-
                     is ApiResult.Error -> {
                         _state.update {
                             it.copy(
@@ -66,59 +75,88 @@ class MemberViewModel @Inject constructor(
                 }
             }
         }
-
-        // Agar refresh button dabaye tab bhi static data hi dikhana hai to:
-        //loadStaticMembers(forceRefresh)
     }
 
-    private fun loadStaticMembers(fore: Boolean) {
-        _state.update { it.copy(isLoading = true) }
+    fun refreshMembers() {
+        loadMembers(lastClubId, lastStatus, true)
+    }
 
-        // Dummy List banayein
-        val dummyMembers = listOf(
-            MemberUiModel(
-                memberId = "1",
-                name = "Rahul Sharma",
-                userName = "rahul",
-                image = "Admin",
-                status = "active",
-                clubName = "Club Name"
-            ),
-            MemberUiModel(
-                memberId = "2",
-                name = "Rajesh Sharma",
-                userName = "rajesh",
-                image = "Admin",
-                status = "deActived",
-                clubName = "Club Name"
-            ),
-            MemberUiModel(
-                memberId = "3",
-                name = "Pankaj Sharma",
-                userName = "pankaj",
-                image = "Admin",
-                status = "expired",
-                clubName = "Club Name"
-            ),
-            MemberUiModel(
-                memberId = "7",
-                name = "Ankur Pathak",
-                userName = "ankur",
-                image = "Admin",
-                status = "active",
-                clubName = "Club Name"
-            ),
-        )
+    fun selectMember(member: MemberUiModel) {
+        _state.update { it.copy(selectedMember = member) }
+    }
 
-        _state.update {
-            it.copy(
-                isLoading = false, members = dummyMembers, error = null
-            )
+    fun updateMember(request: UpdateMemberRequest) {
+        viewModelScope.launch {
+            repository.updateMember(request).collect { result ->
+                when (result) {
+                    ApiResult.Loading -> {
+                        _state.update { it.copy(isLoading = true) }
+                    }
+                    is ApiResult.Success -> {
+                        if (result.data.success == true){
+                            _state.update { it.copy(isLoading = false) }
+                            _event.emit(MemberUiEvent.UpdateSuccess(result.data.message ?: "Update successful"))
+                        } else{
+                            _state.update {
+                                it.copy(
+                                    isLoading = false,
+                                    error = result.data.message ?: "Update failed"
+                                )
+                            }
+                        }
+                    }
+                    is ApiResult.Error -> {
+                        _state.update {
+                            it.copy(
+                                isLoading = false,
+                                error = result.message
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun addMember(request: AddMemberRequest) {
+        viewModelScope.launch {
+            repository.addMember(request).collect { result ->
+                when (result) {
+                    ApiResult.Loading -> {
+                        _state.update { it.copy(isLoading = true) }
+                    }
+                    is ApiResult.Success -> {
+                        if (result.data.success == true) {
+                            _state.update { it.copy(isLoading = false) }
+                            _event.emit(MemberUiEvent.AddSuccess(result.data.message ?: "Member added successfully"))
+                        } else {
+                            _state.update {
+                                it.copy(
+                                    isLoading = false,
+                                    error = result.data.message ?: "Add member failed"
+                                )
+                            }
+                        }
+                    }
+                    is ApiResult.Error -> {
+                        _state.update {
+                            it.copy(
+                                isLoading = false,
+                                error = result.message
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 
     fun clearError() {
         _state.update { it.copy(error = null) }
     }
+}
 
+sealed class MemberUiEvent {
+    data class UpdateSuccess(val message: String) : MemberUiEvent()
+    data class AddSuccess(val message: String) : MemberUiEvent()
 }

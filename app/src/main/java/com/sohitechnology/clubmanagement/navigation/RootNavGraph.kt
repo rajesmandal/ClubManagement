@@ -6,9 +6,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import com.sohitechnology.clubmanagement.main.MainContainerScreen
+import com.sohitechnology.clubmanagement.ui.auth.BiometricAuthenticator
 
 @Composable
-fun RootNavGraph(navController: NavHostController) {
+fun RootNavGraph(
+    navController: NavHostController,
+    biometricAuthenticator: BiometricAuthenticator
+) {
 
     NavHost(
         navController = navController,
@@ -23,7 +27,7 @@ fun RootNavGraph(navController: NavHostController) {
         }
 
         composable(RootRoute.Main.route) {
-            MainContainerScreen()
+            MainContainerScreen(biometricAuthenticator = biometricAuthenticator)
         }
     }
 }

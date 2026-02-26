@@ -27,16 +27,6 @@ class MemberFilterViewModel @Inject constructor(
     }
 
     private fun loadClubs() {
-        // Filhaal API call ko bypass karke static data daal rahe hain
-        /*val staticClubs = listOf(
-            DropdownItem(0, "All Clubs"),
-            DropdownItem(1, "Cricket Club"),
-            DropdownItem(2, "Football Club"),
-            DropdownItem(3, "Swimming Club"),
-            DropdownItem(4, "Gym & Fitness")
-        )
-
-        _clubs.value = staticClubs*/
         viewModelScope.launch {
             val companyId = dataStore.readOnce(
                 SessionKeys.COMPANY_ID,
