@@ -11,6 +11,8 @@ import com.sohitechnology.clubmanagement.core.session.SessionKeys
 import com.sohitechnology.clubmanagement.data.model.AuthRepository
 import com.sohitechnology.clubmanagement.data.model.CredentialUpdateRequest
 import com.sohitechnology.clubmanagement.data.model.LogoutRequest
+import com.sohitechnology.clubmanagement.data.model.ProfileRequest
+import com.sohitechnology.clubmanagement.data.model.ProfileUpdateRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +20,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -29,7 +30,12 @@ data class UserProfile(
     val userName: String = "",
     val role: String = "",
     val profileImage: String = "",
-    val companyId: String = ""
+    val companyId: String = "",
+    val email: String = "",
+    val contactNo: String = "",
+    val address: String = "",
+    val country: String = "",
+    val companyName: String = ""
 )
 
 @HiltViewModel
@@ -43,6 +49,9 @@ class ProfileViewModel @Inject constructor(
 
     private val _credentialUpdateSuccess = MutableSharedFlow<String>()
     val credentialUpdateSuccess = _credentialUpdateSuccess.asSharedFlow()
+
+    private val _profileUpdateSuccess = MutableSharedFlow<String>()
+    val profileUpdateSuccess = _profileUpdateSuccess.asSharedFlow()
 
     val isAppLockEnabled: StateFlow<Boolean> = dataStore.read(SessionKeys.IS_APP_LOCK_ENABLED, false)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -58,6 +67,7 @@ class ProfileViewModel @Inject constructor(
 
     init {
         loadUserProfile()
+        fetchProfileFromServer()
     }
 
     private fun loadUserProfile() {
@@ -77,6 +87,90 @@ class ProfileViewModel @Inject constructor(
                     companyId = companyId
                 )
             }
+        }
+    }
+
+    private fun fetchProfileFromServer() {
+        viewModelScope.launch {
+            val companyId = dataStore.readOnce(SessionKeys.COMPANY_ID, "0").toIntOrNull() ?: 0
+            if (companyId == 0) return@launch
+
+            authRepository.getProfile(ProfileRequest(cId = companyId)).collect { result ->
+                when (result) {
+                    is ApiResult.Success -> {
+                        val data = result.data.data
+                        _userProfile.update {
+                            it.copy(
+                                fullName = data.personalName,
+                                email = data.emailId,
+                                contactNo = data.contactNo,
+                                address = data.address,
+                                country = data.country,
+                                companyName = data.companyName
+                            )
+                        }
+                    }
+                    is ApiResult.Error -> {
+                        // Optionally handle background fetch error
+                    }
+                    is ApiResult.Loading -> { }
+                }
+            }
+        }
+    }
+
+    fun updateProfile(
+        personalName: String,
+        emailId: String,
+        contactNo: String,
+        address: String,
+        country: String,
+        companyName: String
+    ) {
+        viewModelScope.launch {
+            isLoading = true
+            val companyId = dataStore.readOnce(SessionKeys.COMPANY_ID, "0").toIntOrNull() ?: 0
+            val request = ProfileUpdateRequest(
+                address = address,
+                cId = companyId,
+                companyName = companyName,
+                contactNo = contactNo,
+                country = country,
+                emailId = emailId,
+                personalName = personalName
+            )
+
+            authRepository.updateProfile(request).collect { result ->
+                when (result) {
+                    is ApiResult.Success -> {
+                        if (result.data.success) {
+                            _profileUpdateSuccess.emit(result.data.message)
+                            // Update local state
+                            _userProfile.update {
+                                it.copy(
+                                    fullName = personalName,
+                                    email = emailId,
+                                    contactNo = contactNo,
+                                    address = address,
+                                    country = country,
+                                    companyName = companyName
+                                )
+                            }
+                            // Sync important fields to DataStore if necessary
+                            dataStore.save(SessionKeys.FULL_NAME, personalName)
+                        } else {
+                            error = result.data.message
+                        }
+                    }
+                    is ApiResult.Error -> {
+                        error = result.message
+                    }
+                    is ApiResult.Loading -> {
+                        isLoading = true
+                    }
+                }
+            }
+            isLoading = false
         }
     }
 

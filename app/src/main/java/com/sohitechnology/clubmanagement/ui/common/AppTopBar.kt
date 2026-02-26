@@ -54,7 +54,7 @@ fun AppTopBar(
                     .padding(start = 12.dp)
                     .border(1.dp, Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
                     .clickable { onMenuClick() }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
@@ -75,7 +75,7 @@ fun AppTopBar(
             Box(
                 modifier = Modifier
                     .padding(end = 12.dp)
-                    .size(40.dp)
+                    .size(45.dp)
                     .border(1.dp, Color.LightGray.copy(alpha = 0.5f), CircleShape)
                     .clickable { onNotificationClick() },
                 contentAlignment = Alignment.Center

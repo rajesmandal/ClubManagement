@@ -36,4 +36,16 @@ class AuthRepository @Inject constructor(
             api.updateCredential(request)
         }
     }
+
+    fun getProfile(request: ProfileRequest): Flow<ApiResult<ProfileResponse>> {
+        return apiFlow(gson) {
+            api.getProfile(request)
+        }
+    }
+
+    fun updateProfile(request: ProfileUpdateRequest): Flow<ApiResult<ProfileUpdateResponse>> {
+        return apiFlow(gson) {
+            api.updateProfile(request)
+        }
+    }
 }
