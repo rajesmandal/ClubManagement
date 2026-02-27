@@ -163,6 +163,7 @@ fun AppBottomBarPreview() {
     }
 }
 
+//DarkPreview
 @Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun AppBottomBarDarkPreview() {
