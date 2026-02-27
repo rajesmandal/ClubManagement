@@ -58,6 +58,7 @@ import com.sohitechnology.clubmanagement.R
 import com.sohitechnology.clubmanagement.core.NavigationEvent
 import com.sohitechnology.clubmanagement.core.NavigationManager
 import com.sohitechnology.clubmanagement.navigation.BottomNavItem
+import com.sohitechnology.clubmanagement.navigation.MainRoute
 import com.sohitechnology.clubmanagement.navigation.mainNavGraph
 import com.sohitechnology.clubmanagement.ui.UiMessage
 import com.sohitechnology.clubmanagement.ui.UiMessageType
@@ -118,8 +119,16 @@ fun MainContainerScreen(
         onLogoutConfirm = { viewModel.logout() },
         onNavItemClick = { route ->
             scope.launch { drawerState.close() }
+            // To allow back navigation, we just navigate without popping up to the start destination
             navController.navigate(route) {
-                popUpTo(navController.graph.startDestinationId)
+                // If the user specifically wants back to work from drawer, 
+                // we avoid launchSingleTop and popUpTo for destinations that shouldn't reset the stack.
+                // However, for Notification, we definitely want standard back behavior.
+                if (route == BottomNavItem.Home.route) {
+                    popUpTo(navController.graph.startDestinationId) {
+                        inclusive = false
+                    }
+                }
                 launchSingleTop = true
             }
         },
@@ -174,6 +183,7 @@ fun MainContainerContent(
         BottomNavItem.Home,
         BottomNavItem.Members,
         BottomNavItem.Report,
+        BottomNavItem.Notification,
         BottomNavItem.Profile
     )
 
@@ -230,15 +240,6 @@ fun MainContainerContent(
                             modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                         )
                     }
-
-                    // Restore Logout Item
-                    NavigationDrawerItem(
-                        label = { Text("Logout") },
-                        selected = false,
-                        onClick = { onLogoutPopupToggle(true) },
-                        icon = { Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = "Logout") },
-                        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                    )
                 }
 
                 Spacer(modifier = Modifier.weight(1f))

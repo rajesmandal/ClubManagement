@@ -41,11 +41,14 @@ import androidx.compose.ui.text.input.*
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.sohitechnology.clubmanagement.R
 import com.sohitechnology.clubmanagement.data.cache.MemberCache
 import com.sohitechnology.clubmanagement.data.model.UpdateMemberRequest
+import com.sohitechnology.clubmanagement.navigation.MainRoute
 import com.sohitechnology.clubmanagement.ui.UiMessage
 import com.sohitechnology.clubmanagement.ui.UiMessageType
 import com.sohitechnology.clubmanagement.ui.common.CenterPopup
@@ -60,6 +63,7 @@ fun MemberDetailScreen(
     onBack: () -> Unit,
     onNavigateToMembers: () -> Unit,
     onRenew: (MemberUiModel) -> Unit,
+    navController: NavHostController,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope
 ) {
@@ -91,6 +95,7 @@ fun MemberDetailScreen(
         onBack = onBack,
         onNavigateToMembers = onNavigateToMembers,
         onRenew = onRenew,
+        navController = navController,
         onClearError = { viewModel.clearError() },
         onRefreshMembers = { viewModel.refreshMembers() },
         onSuccessPopupDismiss = {
@@ -116,6 +121,7 @@ fun MemberDetailContent(
     onBack: () -> Unit,
     onNavigateToMembers: () -> Unit,
     onRenew: (MemberUiModel) -> Unit,
+    navController: NavHostController,
     onClearError: () -> Unit,
     onRefreshMembers: () -> Unit,
     onSuccessPopupDismiss: () -> Unit,
@@ -171,6 +177,15 @@ fun MemberDetailContent(
                                     )
                                 }
                             }
+                        }
+                        
+                        IconButton(onClick = {
+                            navController.navigate(MainRoute.Notification.route)
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = "Notifications"
+                            )
                         }
                     }
                 )
@@ -836,6 +851,7 @@ fun MemberDetailScreenPreview() {
                     onBack = {},
                     onNavigateToMembers = {},
                     onRenew = {},
+                    navController = rememberNavController(),
                     onClearError = {},
                     onRefreshMembers = {},
                     onSuccessPopupDismiss = {},

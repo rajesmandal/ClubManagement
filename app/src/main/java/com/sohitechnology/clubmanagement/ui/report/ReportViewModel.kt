@@ -34,8 +34,10 @@ data class ReportState(
     val error: String? = null,
     val startDate: String = "",
     val endDate: String = "",
+    val transactionStartDate: String = "",
+    val transactionEndDate: String = "",
     val selectedClubId: Int = 0,
-    val selectedMemberIds: Set<String> = emptySet(),
+    val selectedMemberId: String = "0",
     val selectedTransactionMemberId: Int = 0
 )
 
@@ -50,9 +52,9 @@ class ReportViewModel @Inject constructor(
     val state = _state.asStateFlow()
 
     init {
-        val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault())
         val today = sdf.format(Date())
-        _state.update { it.copy(startDate = today, endDate = today) }
+        _state.update { it.copy(startDate = today, endDate = today, transactionStartDate = today, transactionEndDate = today) }
     }
 
     fun loadMembers(clubId: Int) {
@@ -70,13 +72,24 @@ class ReportViewModel @Inject constructor(
         }
     }
 
+    private fun formatDateForApi(dateStr: String): String {
+        return try {
+            val inputSdf = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault())
+            val outputSdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val date = inputSdf.parse(dateStr)
+            if (date != null) outputSdf.format(date) else dateStr
+        } catch (e: Exception) {
+            dateStr
+        }
+    }
+
     fun getReports(clubIds: String, memberIds: String, startDate: String, endDate: String) {
         _state.update { 
             it.copy(
                 startDate = startDate, 
                 endDate = endDate, 
                 selectedClubId = clubIds.toIntOrNull() ?: 0,
-                selectedMemberIds = if (memberIds.isEmpty()) setOf("0") else memberIds.split(",").toSet()
+                selectedMemberId = memberIds
             ) 
         }
         viewModelScope.launch {
@@ -85,8 +98,8 @@ class ReportViewModel @Inject constructor(
             val request = ReportRequest(
                 cId = companyId,
                 clubIds = clubIds,
-                startDate = startDate,
-                endDate = endDate,
+                startDate = formatDateForApi(startDate),
+                endDate = formatDateForApi(endDate),
                 ids = memberIds
             )
             reportRepository.getReports(request).collect { result ->
@@ -99,14 +112,17 @@ class ReportViewModel @Inject constructor(
         }
     }
 
-    fun getTransactions(memberId: Int) {
-        _state.update { it.copy(selectedTransactionMemberId = memberId) }
+    fun getTransactions(memberId: Int, startDate: String, endDate: String) {
+        _state.update { it.copy(selectedTransactionMemberId = memberId, transactionStartDate = startDate, transactionEndDate = endDate) }
         viewModelScope.launch {
             val companyIdStr = dataStore.readOnce(SessionKeys.COMPANY_ID, "0")
             val companyId = companyIdStr.toIntOrNull() ?: 0
+            
             val request = TransactionRequest(
                 cId = companyId,
-                memberId = memberId
+                id = memberId,
+                startDate = formatDateForApi(startDate),
+                endDate = formatDateForApi(endDate)
             )
             reportRepository.getTransactions(request).collect { result ->
                 when (result) {

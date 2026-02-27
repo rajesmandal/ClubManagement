@@ -18,6 +18,7 @@ import com.sohitechnology.clubmanagement.ui.member.PackageSelectionScreen
 import com.sohitechnology.clubmanagement.ui.member.PackageViewModel
 import com.sohitechnology.clubmanagement.ui.report.ReportTabScreen
 import com.sohitechnology.clubmanagement.ui.auth.BiometricAuthenticator
+import com.sohitechnology.clubmanagement.ui.notification.NotificationScreen
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 fun NavGraphBuilder.mainNavGraph(
@@ -84,8 +85,9 @@ fun NavGraphBuilder.mainNavGraph(
                     navController.popBackStack(MainRoute.Members.route, inclusive = false)
                 },
                 onRenew = { member ->
-                    navController.navigate("${MainRoute.PackageSelection.route}/${member.memberId}/${member.expiryDate}")
+                    navController.navigate("${MainRoute.PackageSelection.route}/${member.id}/${member.expiryDate}")
                 },
+                navController = navController,
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = this@composable
             )
@@ -127,6 +129,10 @@ fun NavGraphBuilder.mainNavGraph(
 
     composable(MainRoute.Report.route) {
         ReportTabScreen(navController = navController, onMenuClick = onMenuClick)
+    }
+
+    composable(MainRoute.Notification.route) {
+        NotificationScreen(navController = navController, onMenuClick = onMenuClick)
     }
 
     composable(MainRoute.Profile.route) {

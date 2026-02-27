@@ -44,6 +44,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.sohitechnology.clubmanagement.navigation.AppBottomBar
+import com.sohitechnology.clubmanagement.navigation.MainRoute
 import com.sohitechnology.clubmanagement.ui.common.CenterPopup
 import com.sohitechnology.clubmanagement.ui.UiMessage
 import com.sohitechnology.clubmanagement.ui.UiMessageType
@@ -128,7 +129,10 @@ fun MembersContent(
         topBar = {
             AppTopBar(
                 title = "Members",
-                onMenuClick = onMenuClick
+                onMenuClick = onMenuClick,
+                onNotificationClick = {
+                    navController.navigate(MainRoute.Notification.route)
+                }
             )
         },
         bottomBar = {

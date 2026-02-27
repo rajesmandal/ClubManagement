@@ -1,5 +1,10 @@
 package com.sohitechnology.clubmanagement.ui.home
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -21,15 +26,18 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.sohitechnology.clubmanagement.data.model.MemberCountData
 import com.sohitechnology.clubmanagement.navigation.AppBottomBar
+import com.sohitechnology.clubmanagement.navigation.MainRoute
 import com.sohitechnology.clubmanagement.ui.common.AppTopBar
 import com.sohitechnology.clubmanagement.ui.common.EmptyState
 import com.sohitechnology.clubmanagement.ui.member.MemberItem
@@ -46,6 +54,7 @@ fun HomeScreen(
     animatedVisibilityScope: AnimatedVisibilityScope,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val memberCount by viewModel.memberCount.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
@@ -53,8 +62,33 @@ fun HomeScreen(
     val expiryMembers by viewModel.expiryMembers.collectAsState()
     val isExpiryLoading by viewModel.isExpiryLoading.collectAsState()
 
+    // Permission Request Logic
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        var hasNotificationPermission by remember {
+            mutableStateOf(
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            )
+        }
+
+        val launcher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+            onResult = { isGranted ->
+                hasNotificationPermission = isGranted
+            }
+        )
+
+        LaunchedEffect(Unit) {
+            if (!hasNotificationPermission) {
+                launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
-        viewModel.getMemberCount() // Hardcoded clubId for now
+        viewModel.getMemberCount()
         viewModel.getMemberExpiry()
     }
 
@@ -90,7 +124,10 @@ fun HomeContent(
         topBar = {
             AppTopBar(
                 title = "Home",
-                onMenuClick = onMenuClick
+                onMenuClick = onMenuClick,
+                onNotificationClick = {
+                    navController.navigate(MainRoute.Notification.route)
+                }
             )
         },
         bottomBar = {
@@ -169,7 +206,7 @@ fun MemberCountCard(data: MemberCountData) {
         border = BorderStroke(0.5.dp, Color.Gray.copy(alpha = 0.2f))
     ) {
         Column(
-            modifier = Modifier.padding(vertical = 32.dp, horizontal = 24.dp),
+            modifier = Modifier.padding(vertical = 24.dp, horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -207,7 +244,7 @@ fun MemberCountCard(data: MemberCountData) {
                 }
 
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier
                         .padding(start = 16.dp)
                         .weight(1f)
@@ -231,6 +268,12 @@ fun MemberCountCard(data: MemberCountData) {
                         count = data.expired ?: 0,
                         gradient = Brush.linearGradient(listOf(Color(0xFFF87171), Color(0xFFEF4444)))
                     )
+                    LegendItem(
+                        color = Color(0xFF3B82F6), 
+                        label = "Today Renew", 
+                        count = data.todayRenew ?: 0,
+                        gradient = Brush.linearGradient(listOf(Color(0xFF60A5FA), Color(0xFF3B82F6)))
+                    )
                 }
             }
         }
@@ -244,6 +287,7 @@ fun DonutChart(data: MemberCountData, modifier: Modifier = Modifier) {
     val activeAngle = if (total > 0) ((data.active ?: 0) / total) * 360f else 0f
     val deactiveAngle = if (total > 0) ((data.deactive ?: 0) / total) * 360f else 0f
     val expiredAngle = if (total > 0) ((data.expired ?: 0) / total) * 360f else 0f
+    val todayRenewAngle = if (total > 0) ((data.todayRenew ?: 0) / total) * 360f else 0f
 
     Canvas(modifier = modifier) {
         val strokeWidth = 14.dp.toPx()
@@ -300,6 +344,21 @@ fun DonutChart(data: MemberCountData, modifier: Modifier = Modifier) {
                 useCenter = false,
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
             )
+            currentStartAngle += expiredAngle
+        }
+
+        // Today Renew Arc
+        if (todayRenewAngle > 0) {
+            drawArc(
+                brush = Brush.sweepGradient(
+                    0.0f to Color(0xFF60A5FA),
+                    1.0f to Color(0xFF3B82F6)
+                ),
+                startAngle = currentStartAngle,
+                sweepAngle = todayRenewAngle,
+                useCenter = false,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
         }
     }
 }
@@ -345,7 +404,8 @@ fun HomeScreenPreview() {
         active = 50,
         deactive = 10,
         expired = 5,
-        all = 65
+        all = 65,
+        todayRenew = 2
     )
 
     val mockExpiryMembers = listOf(

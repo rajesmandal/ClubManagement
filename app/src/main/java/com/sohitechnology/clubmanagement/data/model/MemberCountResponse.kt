@@ -11,5 +11,6 @@ data class MemberCountData(
     val active: Int? = null,
     val all: Int? = null,
     val deactive: Int? = null,
-    val expired: Int? = null
+    val expired: Int? = null,
+    val todayRenew: Int? = null
 )

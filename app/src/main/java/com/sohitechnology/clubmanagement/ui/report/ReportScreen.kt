@@ -39,6 +39,7 @@ import com.sohitechnology.clubmanagement.R
 import com.sohitechnology.clubmanagement.data.model.ReportData
 import com.sohitechnology.clubmanagement.data.model.TransactionData
 import com.sohitechnology.clubmanagement.navigation.AppBottomBar
+import com.sohitechnology.clubmanagement.navigation.MainRoute
 import com.sohitechnology.clubmanagement.ui.common.AppDropdown
 import com.sohitechnology.clubmanagement.ui.common.AppTopBar
 import com.sohitechnology.clubmanagement.ui.common.DropdownItem
@@ -68,7 +69,9 @@ fun ReportTabScreen(
         onGetReports = { clubId, memberIds, start, end ->
             viewModel.getReports(clubId, memberIds, start, end)
         },
-        onGetTransactions = { viewModel.getTransactions(it) }
+        onGetTransactions = { memberId, start, end ->
+            viewModel.getTransactions(memberId, start, end)
+        }
     )
 }
 
@@ -80,23 +83,45 @@ fun ReportTabContent(
     onMenuClick: () -> Unit,
     onLoadMembers: (Int) -> Unit,
     onGetReports: (String, String, String, String) -> Unit,
-    onGetTransactions: (Int) -> Unit
+    onGetTransactions: (Int, String, String) -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Report", "Transaction")
 
-    // Initial Data Load
+    // Initial Data Load logic improved to persist state during navigation
     LaunchedEffect(Unit) {
-        onLoadMembers(0)
-        onGetReports("0", "0", state.startDate, state.endDate)
-        onGetTransactions(0)
+        if (state.members.isEmpty()) {
+            onLoadMembers(0)
+        }
+        
+        // Only load reports if they haven't been loaded yet
+        if (state.reports.isEmpty() && !state.isLoading) {
+            onGetReports(
+                state.selectedClubId.toString(), 
+                state.selectedMemberId, 
+                state.startDate, 
+                state.endDate
+            )
+        }
+        
+        // Only load transactions if they haven't been loaded yet
+        if (state.transactions.isEmpty() && !state.isLoading) {
+            onGetTransactions(
+                state.selectedTransactionMemberId, 
+                state.transactionStartDate, 
+                state.transactionEndDate
+            )
+        }
     }
 
     Scaffold(
         topBar = {
             AppTopBar(
                 title = "Reports",
-                onMenuClick = onMenuClick
+                onMenuClick = onMenuClick,
+                onNotificationClick = {
+                    navController.navigate(MainRoute.Notification.route)
+                }
             )
         },
         bottomBar = {
@@ -181,7 +206,9 @@ fun ReportScreenContent(
             onClick = { showFilterDialog = true },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(16.dp)
+                .padding(16.dp),
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
         ) {
             Icon(Icons.Default.FilterList, contentDescription = "Filter")
         }
@@ -192,7 +219,7 @@ fun ReportScreenContent(
             clubs = clubs,
             members = state.members,
             initialClubId = state.selectedClubId,
-            initialMemberIds = state.selectedMemberIds,
+            initialMemberIds = state.selectedMemberId.split(",").toSet(),
             initialStartDate = state.startDate,
             initialEndDate = state.endDate,
             onDismiss = { showFilterDialog = false },
@@ -224,7 +251,7 @@ fun TransactionScreen(
         state = state,
         clubs = clubs,
         onLoadMembers = { viewModel.loadMembers(it) },
-        onGetTransactions = { viewModel.getTransactions(it) }
+        onGetTransactions = { memberId, start, end -> viewModel.getTransactions(memberId, start, end) }
     )
 }
 
@@ -233,7 +260,7 @@ fun TransactionScreenContent(
     state: ReportState,
     clubs: List<DropdownItem>,
     onLoadMembers: (Int) -> Unit,
-    onGetTransactions: (Int) -> Unit
+    onGetTransactions: (Int, String, String) -> Unit
 ) {
     var showFilterDialog by remember { mutableStateOf(false) }
 
@@ -282,7 +309,9 @@ fun TransactionScreenContent(
             onClick = { showFilterDialog = true },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(16.dp)
+                .padding(16.dp),
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
         ) {
             Icon(Icons.Default.FilterList, contentDescription = "Filter")
         }
@@ -294,12 +323,14 @@ fun TransactionScreenContent(
             members = state.members,
             initialClubId = state.selectedClubId,
             initialMemberId = state.selectedTransactionMemberId,
+            initialStartDate = state.transactionStartDate,
+            initialEndDate = state.transactionEndDate,
             onDismiss = { showFilterDialog = false },
             onClubSelected = { clubId ->
                 onLoadMembers(clubId)
             },
-            onApply = { memberId ->
-                onGetTransactions(memberId)
+            onApply = { memberId, start, end ->
+                onGetTransactions(memberId, start, end)
                 showFilterDialog = false
             }
         )
@@ -324,6 +355,11 @@ fun ReportFilterDialog(
     var start by remember { mutableStateOf(initialStartDate) }
     var end by remember { mutableStateOf(initialEndDate) }
     var isMemberDropdownExpanded by remember { mutableStateOf(false) }
+
+    // Case-insensitive A-Z sorting for member names
+    val sortedMembers = remember(members) { 
+        members.sortedBy { it.name.lowercase() } 
+    }
 
     LaunchedEffect(Unit) {
         onClubSelected(clubId)
@@ -397,7 +433,7 @@ fun ReportFilterDialog(
                                     Text("All", modifier = Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold)
                                 }
                             }
-                            items(members) { member ->
+                            items(sortedMembers) { member ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth().clickable {
                                         val newIds = memberIds.toMutableSet()
@@ -443,13 +479,22 @@ fun TransactionFilterDialog(
     members: List<MemberUiModel>,
     initialClubId: Int = 0,
     initialMemberId: Int = 0,
+    initialStartDate: String,
+    initialEndDate: String,
     onDismiss: () -> Unit,
     onClubSelected: (Int) -> Unit,
-    onApply: (Int) -> Unit
+    onApply: (Int, String, String) -> Unit
 ) {
     var clubId by remember { mutableIntStateOf(initialClubId) }
     var selectedMemberId by remember { mutableIntStateOf(initialMemberId) }
+    var start by remember { mutableStateOf(initialStartDate) }
+    var end by remember { mutableStateOf(initialEndDate) }
     var isMemberDropdownExpanded by remember { mutableStateOf(false) }
+
+    // Case-insensitive A-Z sorting for member names
+    val sortedMembers = remember(members) { 
+        members.sortedBy { it.name.lowercase() } 
+    }
 
     LaunchedEffect(Unit) {
         onClubSelected(clubId)
@@ -488,7 +533,7 @@ fun TransactionFilterDialog(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            val selectedMemberName = members.find { it.id == selectedMemberId }?.name ?: if (selectedMemberId == 0) "All Members" else "Select Member"
+                            val selectedMemberName = sortedMembers.find { it.id == selectedMemberId }?.name ?: "Select Member"
                             Text(selectedMemberName, style = MaterialTheme.typography.bodyMedium)
                             Icon(
                                 if (isMemberDropdownExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
@@ -505,40 +550,34 @@ fun TransactionFilterDialog(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
                         LazyColumn {
-                            item {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().clickable {
-                                        selectedMemberId = 0
-                                        isMemberDropdownExpanded = false
-                                    }.padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Checkbox(checked = selectedMemberId == 0, onCheckedChange = null)
-                                    Text("All", modifier = Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            items(members) { member ->
+                            items(sortedMembers) { member ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth().clickable {
                                         selectedMemberId = member.id
                                         isMemberDropdownExpanded = false
-                                    }.padding(8.dp),
+                                    }.padding(16.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Checkbox(checked = selectedMemberId == member.id, onCheckedChange = null)
-                                    Text(member.name, modifier = Modifier.padding(start = 8.dp))
+                                    Text(member.name, modifier = Modifier.weight(1f))
                                 }
                             }
                         }
                     }
                 }
 
+                Spacer(Modifier.height(12.dp))
+
+                DatePickerField(label = "Start Date", date = start) { start = it }
+                Spacer(Modifier.height(8.dp))
+                DatePickerField(label = "End Date", date = end) { end = it }
+
                 Spacer(Modifier.height(24.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text("Cancel") }
                     Button(
-                        onClick = { onApply(selectedMemberId) }
+                        onClick = { onApply(selectedMemberId, start, end) },
+                        enabled = selectedMemberId != 0
                     ) { Text("Apply") }
                 }
             }
@@ -556,7 +595,7 @@ fun DatePickerField(label: String, date: String, onDateSelected: (String) -> Uni
             DatePickerDialog(context, { _, y, m, d ->
                 val cal = Calendar.getInstance()
                 cal.set(y, m, d)
-                val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+                val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault())
                 onDateSelected(sdf.format(cal.time))
             }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
         },
@@ -867,7 +906,7 @@ fun ReportTabScreenPreview() {
             onMenuClick = {},
             onLoadMembers = {},
             onGetReports = { _, _, _, _ -> },
-            onGetTransactions = {}
+            onGetTransactions = { _, _, _ -> }
         )
     }
 }

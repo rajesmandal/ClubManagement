@@ -1,9 +1,14 @@
 package com.sohitechnology.clubmanagement.navigation
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -17,8 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +47,14 @@ fun AppBottomBar(navController: NavHostController) {
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    
+    // Use local state for instant UI update
+    var localSelectedRoute by remember { mutableStateOf(currentRoute) }
+
+    // Sync local state when the actual navigation finishes (e.g., system back button)
+    LaunchedEffect(currentRoute) {
+        localSelectedRoute = currentRoute
+    }
 
     Box(
         modifier = Modifier
@@ -59,26 +71,47 @@ fun AppBottomBar(navController: NavHostController) {
             Row(
                 modifier = Modifier
                     .padding(horizontal = 10.dp, vertical = 10.dp)
-                    .animateContentSize(),
+                    .animateContentSize(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessHigh // Fast layout reaction
+                        )
+                    ),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 items.forEach { item ->
-                    val isSelected = currentRoute == item.route
-                    val contentColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+                    val isSelected = localSelectedRoute == item.route
+                    
+                    val contentColor by animateColorAsState(
+                        targetValue = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                        animationSpec = tween(durationMillis = 100), // Instant fade
+                        label = "contentColor"
+                    )
+                    
+                    val backgroundColor by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                        animationSpec = tween(durationMillis = 100), // Instant background change
+                        label = "backgroundColor"
+                    )
 
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(50.dp))
                             .background(backgroundColor)
-                            .clickable {
-                                navController.navigate(item.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null 
+                            ) {
+                                if (localSelectedRoute != item.route) {
+                                    localSelectedRoute = item.route // Instant visual feedback on click
+                                    navController.navigate(item.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
                                 }
                             }
                     ) {

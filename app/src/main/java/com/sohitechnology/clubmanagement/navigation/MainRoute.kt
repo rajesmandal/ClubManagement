@@ -9,4 +9,5 @@ sealed class MainRoute(val route: String) {
     object Report : MainRoute("report")
     object Profile : MainRoute("profile")
     object MemberGraph : MainRoute("member_graph")
+    object Notification : MainRoute("notification")
 }

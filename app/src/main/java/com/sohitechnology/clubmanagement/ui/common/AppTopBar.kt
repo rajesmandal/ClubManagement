@@ -1,5 +1,6 @@
 package com.sohitechnology.clubmanagement.ui.common
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -16,10 +17,8 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,9 +34,9 @@ import com.sohitechnology.clubmanagement.ui.theme.ClubManagementTheme
 fun AppTopBar(
     title: String,
     onMenuClick: () -> Unit,
-    onNotificationClick: () -> Unit = {}
+    onNotificationClick: () -> Unit = {},
+    hasUnreadNotifications: Boolean = false
 ) {
-    // Use onSurface color from the theme scheme instead of checking isSystemInDarkTheme()
     val contentColor = MaterialTheme.colorScheme.onSurface
 
     CenterAlignedTopAppBar(
@@ -86,6 +85,16 @@ fun AppTopBar(
                     modifier = Modifier.size(20.dp),
                     tint = contentColor
                 )
+                
+                if (hasUnreadNotifications) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(Color.Red, CircleShape)
+                            .align(Alignment.TopEnd)
+                            .padding(end = 8.dp, top = 8.dp)
+                    )
+                }
             }
         },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -98,14 +107,6 @@ fun AppTopBar(
 @Composable
 fun AppTopBarPreview() {
     ClubManagementTheme(darkTheme = false) {
-        AppTopBar(title = "Home", onMenuClick = {})
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun DarkAppTopBarPreview() {
-    ClubManagementTheme(darkTheme = true) {
-        AppTopBar(title = "Home", onMenuClick = {})
+        AppTopBar(title = "Home", onMenuClick = {}, hasUnreadNotifications = true)
     }
 }

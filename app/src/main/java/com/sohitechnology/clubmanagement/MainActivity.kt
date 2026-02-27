@@ -1,14 +1,13 @@
 package com.sohitechnology.clubmanagement
 
+import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.biometric.BiometricManager
-import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +42,7 @@ import com.sohitechnology.clubmanagement.core.NavigationEvent
 import com.sohitechnology.clubmanagement.core.NavigationManager
 import com.sohitechnology.clubmanagement.main.MainViewModel
 import com.sohitechnology.clubmanagement.navigation.AuthRoute
+import com.sohitechnology.clubmanagement.navigation.MainRoute
 import com.sohitechnology.clubmanagement.navigation.RootNavGraph
 import com.sohitechnology.clubmanagement.navigation.RootRoute
 import com.sohitechnology.clubmanagement.ui.auth.BiometricAuthenticator
@@ -53,7 +53,6 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
 
-    private val TAG = "MainActivityAuth"
     private val viewModel: MainViewModel by viewModels()
 
     @Inject
@@ -124,15 +123,18 @@ class MainActivity : FragmentActivity() {
                         }
                     }
 
-                    // Main App Content
+                    LaunchedEffect(intent) {
+                        handleDeepLink(intent, isLoggedIn) {
+                            navController.navigate(MainRoute.Members.route)
+                        }
+                    }
+
                     RootNavGraph(
                         navController = navController,
                         biometricAuthenticator = biometricAuthenticator
                     )
 
-                    // App Lock Overlay - Only show if LOGGED IN, LOCK ENABLED, and APP IS LOCKED (Cold Start)
                     if (isLoggedIn == true && isAppLockEnabled && isAppLocked) {
-                        // Automatically trigger biometric on first composition (Cold Start)
                         LaunchedEffect(Unit) {
                             showBiometricPrompt()
                         }
@@ -144,6 +146,20 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+    }
+
+    private fun handleDeepLink(intent: Intent?, isLoggedIn: Boolean?, onNavigate: () -> Unit) {
+        val data = intent?.data
+        if (data != null && data.toString() == "clubmanagement://members") {
+            if (isLoggedIn == true) {
+                onNavigate()
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
     }
 
     @Composable
@@ -213,14 +229,11 @@ class MainActivity : FragmentActivity() {
                     viewModel.setAppLocked(false)
                 },
                 onError = { errorCode, _ ->
-                    // Handle specific errors if needed, overlay remains visible
                 },
                 onFailed = {
-                    // Failures keep the overlay visible
                 }
             )
         } else {
-            // No security enrolled, just unlock
             viewModel.setAppLocked(false)
         }
     }

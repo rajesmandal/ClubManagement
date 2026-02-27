@@ -106,4 +106,9 @@ dependencies {
 
     // Process Lifecycle
     implementation(libs.androidx.lifecycle.process)
+
+    // WorkManager
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.hilt.work)
+    ksp(libs.ksp.hilt.work)
 }

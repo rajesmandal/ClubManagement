@@ -1,5 +1,10 @@
 package com.sohitechnology.clubmanagement.ui.profile
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -7,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
@@ -21,10 +27,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -34,6 +42,7 @@ import coil.request.ImageRequest
 import com.sohitechnology.clubmanagement.core.NavigationEvent
 import com.sohitechnology.clubmanagement.core.NavigationManager
 import com.sohitechnology.clubmanagement.navigation.AppBottomBar
+import com.sohitechnology.clubmanagement.navigation.MainRoute
 import com.sohitechnology.clubmanagement.ui.UiMessage
 import com.sohitechnology.clubmanagement.ui.UiMessageType
 import com.sohitechnology.clubmanagement.ui.auth.BiometricAuthenticator
@@ -56,6 +65,26 @@ fun ProfileScreen(
 
     var showSuccessPopup by remember { mutableStateOf(false) }
     var successMessage by remember { mutableStateOf("") }
+
+    var isNotificationEnabled by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true // Notifications are enabled by default below Android 13
+            }
+        )
+    }
+
+    val notificationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            isNotificationEnabled = isGranted
+        }
+    )
 
     LaunchedEffect(Unit) {
         viewModel.credentialUpdateSuccess.collect { message ->
@@ -87,9 +116,17 @@ fun ProfileScreen(
         navController = navController,
         userProfile = userProfile,
         isAppLockEnabled = isAppLockEnabled,
+        isNotificationEnabled = isNotificationEnabled,
         isLoading = viewModel.isLoading,
         error = viewModel.error,
         onMenuClick = onMenuClick,
+        onNotificationToggle = { checked ->
+            if (checked && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else if (!checked && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                isNotificationEnabled = false
+            }
+        },
         onAppLockToggle = { checked ->
             if (checked) {
                 (context as? FragmentActivity)?.let { activity ->
@@ -126,9 +163,11 @@ fun ProfileContent(
     navController: NavHostController,
     userProfile: UserProfile,
     isAppLockEnabled: Boolean,
+    isNotificationEnabled: Boolean,
     isLoading: Boolean,
     error: String?,
     onMenuClick: () -> Unit,
+    onNotificationToggle: (Boolean) -> Unit,
     onAppLockToggle: (Boolean) -> Unit,
     onUpdateCredentials: (String, String, Int) -> Unit,
     onUpdateProfile: (String, String, String, String, String, String) -> Unit,
@@ -150,7 +189,10 @@ fun ProfileContent(
         topBar = {
             AppTopBar(
                 title = "My Profile",
-                onMenuClick = onMenuClick
+                onMenuClick = onMenuClick,
+                onNotificationClick = {
+                    navController.navigate(MainRoute.Notification.route)
+                }
             )
         },
         bottomBar = {
@@ -201,10 +243,19 @@ fun ProfileContent(
                 ProfileSectionTitle("Settings")
                 ProfileInfoCard {
                     ProfileSwitchItem(
+                        icon = Icons.Outlined.Notifications,
+                        label = "Notifications",
+                        checked = isNotificationEnabled,
+                        onCheckedChange = onNotificationToggle,
+                        thumbIcon = if (isNotificationEnabled) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsOff
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(start = 56.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    ProfileSwitchItem(
                         icon = Icons.Outlined.Security,
                         label = "App Lock",
                         checked = isAppLockEnabled,
-                        onCheckedChange = onAppLockToggle
+                        onCheckedChange = onAppLockToggle,
+                        thumbIcon = if (isAppLockEnabled) Icons.Outlined.Lock else Icons.Outlined.LockOpen
                     )
                     HorizontalDivider(modifier = Modifier.padding(start = 56.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     ProfileActionItem(icon = Icons.Outlined.Lock, label = "Update Credentials", onClick = { showUpdateBottomSheet = true })
@@ -293,7 +344,7 @@ fun EditProfileSheetContent(
         Spacer(modifier = Modifier.height(12.dp))
         OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
         Spacer(modifier = Modifier.height(12.dp))
-        OutlinedTextField(value = contact, onValueChange = { contact = it }, label = { Text("Contact No") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+        OutlinedTextField(value = contact, onValueChange = { contact = it }, label = { Text("Contact No") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),shape = RoundedCornerShape(12.dp))
         Spacer(modifier = Modifier.height(12.dp))
         OutlinedTextField(value = company, onValueChange = { company = it }, label = { Text("Company Name") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
         Spacer(modifier = Modifier.height(12.dp))
@@ -313,7 +364,13 @@ fun EditProfileSheetContent(
 }
 
 @Composable
-fun ProfileSwitchItem(icon: ImageVector, label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+fun ProfileSwitchItem(
+    icon: ImageVector,
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    thumbIcon: ImageVector
+) {
     Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(modifier = Modifier.size(40.dp), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.background) {
@@ -327,7 +384,7 @@ fun ProfileSwitchItem(icon: ImageVector, label: String, checked: Boolean, onChec
             onCheckedChange = onCheckedChange,
             thumbContent = {
                 Icon(
-                    imageVector = if (checked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
+                    imageVector = thumbIcon,
                     contentDescription = null,
                     modifier = Modifier.size(SwitchDefaults.IconSize),
                     tint = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
@@ -470,9 +527,11 @@ fun ProfileScreenPreview() {
                 companyName = "Club Management Inc"
             ),
             isAppLockEnabled = true,
+            isNotificationEnabled = true,
             isLoading = false,
             error = null,
             onMenuClick = {},
+            onNotificationToggle = {},
             onAppLockToggle = {},
             onUpdateCredentials = { _, _, _ -> },
             onUpdateProfile = { _, _, _, _, _, _ -> },
