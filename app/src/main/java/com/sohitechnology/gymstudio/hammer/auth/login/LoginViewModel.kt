@@ -1,0 +1,170 @@
+package com.sohitechnology.gymstudio.hammer.auth.login
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.sohitechnology.gymstudio.hammer.core.NavigationEvent
+import com.sohitechnology.gymstudio.hammer.core.NavigationManager
+import com.sohitechnology.gymstudio.hammer.core.common.ApiResult
+import com.sohitechnology.gymstudio.hammer.core.session.AppDataStore
+import com.sohitechnology.gymstudio.hammer.core.session.SessionKeys
+import com.sohitechnology.gymstudio.hammer.data.repository.AuthRepository
+import com.sohitechnology.gymstudio.hammer.data.model.LoginData
+import com.sohitechnology.gymstudio.hammer.data.model.LoginRequest
+import com.sohitechnology.gymstudio.hammer.ui.UiMessage
+import com.sohitechnology.gymstudio.hammer.ui.UiMessageType
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class LoginViewModel @Inject constructor(
+    private val repository: AuthRepository, // api repo
+    private val dataStore: AppDataStore      // session store
+) : ViewModel() {
+
+    private val _state = MutableStateFlow(LoginState())
+    val state = _state.asStateFlow()
+
+    fun onEvent(event: LoginEvent) {
+        when (event) {
+
+            is LoginEvent.CompanyIdChanged -> {
+                _state.update {
+                    it.copy(
+                        companyId = event.value,
+                        companyIdError = null
+                    )
+                }
+            }
+
+            is LoginEvent.EmailChanged -> {
+                _state.update {
+                    it.copy(
+                        username = event.value,
+                        usernameError = null
+                    )
+                }
+            }
+
+            is LoginEvent.PasswordChanged -> {
+                _state.update {
+                    it.copy(
+                        password = event.value,
+                        passwordError = null
+                    )
+                }
+            }
+
+            LoginEvent.LoginClicked -> {
+                validateAndLogin() // trigger login flow
+            }
+        }
+    }
+
+    private fun validateAndLogin() {
+        val current = _state.value
+
+        when {
+
+            !current.companyId.trim().all { it.isDigit() } ->{
+                _state.update { it.copy(companyIdError = "Company ID must contain only numbers") }
+            }
+
+            current.username.isBlank() -> {
+                _state.update {
+                    it.copy(
+                        usernameError = "Enter a valid username"
+                    )
+                }
+            }
+
+            current.password.isBlank() -> {
+                _state.update { it.copy(passwordError = "Password required") }
+            }
+
+            else -> {
+                loginApiCall() // validation pass → api call
+            }
+        }
+    }
+
+    private fun loginApiCall() {
+        viewModelScope.launch {
+            repository.login(
+                LoginRequest(
+                    userName = state.value.username.trim(),
+                    password = state.value.password,
+                    cId = state.value.companyId.trim().toInt(),
+                    deviceId = ""
+                )
+            ).collect { result ->
+
+                when (result) {
+
+                    is ApiResult.Loading -> {
+                        _state.update { it.copy(isLoading = true) }
+                    }
+
+                    is ApiResult.Success -> {
+                        val response = result.data
+                        val data = response.data
+
+                        if (response.success == true && data != null) {
+                            saveSession(data)
+                            _state.update { it.copy(isLoading = false, successMessage = "Login Successfully") }
+                            // login success pe
+                            NavigationManager.navigate(NavigationEvent.ToHome)
+                        } else {
+                            // Agar success false hai ya data null hai
+                            val errorMsg = response.message ?: "Unknown Reason"
+
+                            _state.update {
+                                it.copy(
+                                    isLoading = false,
+                                    uiMessage = UiMessage(
+                                        title = "Login Failed",
+                                        message = errorMsg,
+                                        type = UiMessageType.INFO
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    is ApiResult.Error -> {
+                        _state.update {
+                            it.copy(
+                                isLoading = false,
+                                uiMessage = UiMessage(
+                                    title = "Login Failed",
+                                    message = result.message ?: "An unknown error occurred",
+                                    type = UiMessageType.ERROR
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun saveSession(data: LoginData) { //after login save details
+        dataStore.save(SessionKeys.TOKEN, data.accessToken ?: "")
+        dataStore.save(SessionKeys.USER_ID, data.userId ?: 0)
+        dataStore.save(SessionKeys.IS_LOGGED_IN, true)
+        dataStore.save(SessionKeys.COMPANY_ID, data.cId?.toString() ?: "")
+        
+        // Save user profile data
+        dataStore.save(SessionKeys.ROLE, data.role ?: "")
+        dataStore.save(SessionKeys.USER_NAME, data.userName ?: "")
+        dataStore.save(SessionKeys.FULL_NAME, data.fullName ?: "")
+        dataStore.save(SessionKeys.PROFILE_IMAGE, data.profileImage ?: "")
+    }
+
+    fun clearUiMessage() {
+        _state.update { it.copy(uiMessage = null) } // dismiss popup
+    }
+}

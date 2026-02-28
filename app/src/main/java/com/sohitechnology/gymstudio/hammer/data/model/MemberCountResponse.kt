@@ -1,0 +1,16 @@
+package com.sohitechnology.gymstudio.hammer.data.model
+
+data class MemberCountResponse(
+    val data: MemberCountData? = null,
+    val error: Boolean? = null,
+    val message: String? = null,
+    val success: Boolean? = null
+)
+
+data class MemberCountData(
+    val active: Int? = null,
+    val all: Int? = null,
+    val deactive: Int? = null,
+    val expired: Int? = null,
+    val todayRenew: Int? = null
+)

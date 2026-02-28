@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "291718512162",
+    "project_id": "gymstudio-4c046",
+    "storage_bucket": "gymstudio-4c046.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:291718512162:android:3aaaf6d7940596d0e7147b",
+        "android_client_info": {
+          "package_name": "com.sohitechnology.gymstudio.hammer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBt_Bg6CCtpvJdD03OaDs-o_IM56UprgQE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

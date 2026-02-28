@@ -4,14 +4,16 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.google.crashlytics)
 }
 
 android {
-    namespace = "com.sohitechnology.clubmanagement"
+    namespace = "com.sohitechnology.gymstudio.hammer"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.sohitechnology.clubmanagement"
+        applicationId = "com.sohitechnology.gymstudio.hammer"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -78,6 +80,11 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
+
+    // Firebase
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.crashlytics)
 
     // Coroutine
     implementation(libs.coroutines.core)
