@@ -8,6 +8,8 @@ import com.sohitechnology.gymstudio.hammer.data.model.MemberCountRequest
 import com.sohitechnology.gymstudio.hammer.data.model.MemberCountResponse
 import com.sohitechnology.gymstudio.hammer.data.model.MemberExpiryRequest
 import com.sohitechnology.gymstudio.hammer.data.model.MemberExpiryResponse
+import com.sohitechnology.gymstudio.hammer.data.model.UpdateFcmTokenRequest
+import com.sohitechnology.gymstudio.hammer.data.model.UpdateFcmTokenResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -29,6 +31,13 @@ class HomeRepository @Inject constructor(
         emit(ApiResult.Loading)
         emit(safeApiCall(gson) {
             api.memberExpiry(request)
+        })
+    }.flowOn(Dispatchers.IO)
+
+    fun updateFcmToken(request: UpdateFcmTokenRequest): Flow<ApiResult<UpdateFcmTokenResponse>> = flow {
+        emit(ApiResult.Loading)
+        emit(safeApiCall(gson) {
+            api.updateFcmToken(request)
         })
     }.flowOn(Dispatchers.IO)
 }

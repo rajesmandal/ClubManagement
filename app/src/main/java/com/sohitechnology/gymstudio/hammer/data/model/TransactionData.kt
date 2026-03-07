@@ -7,5 +7,6 @@ data class TransactionData(
     val price: Int? = null,
     val startDate: String? = null,
     val validity: String? = null,
-    val validityType: String? = null
+    val validityType: String? = null,
+    val memberId: String? = null
 )

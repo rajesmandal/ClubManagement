@@ -278,7 +278,7 @@ fun StatusOption(
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
-@Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Preview(showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_NO)
 @Composable
 fun MembersScreenPreview() {
     ClubManagementTheme {

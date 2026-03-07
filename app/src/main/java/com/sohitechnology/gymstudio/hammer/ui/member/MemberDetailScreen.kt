@@ -1,12 +1,27 @@
 package com.sohitechnology.gymstudio.hammer.ui.member
 
+import android.Manifest
 import android.app.DatePickerDialog
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.launch
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -19,7 +34,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
@@ -74,6 +92,10 @@ fun MemberDetailScreen(
                     successMessage = event.message
                     showSuccessPopup = true
                 }
+                is MemberUiEvent.ImageUploadSuccess -> {
+                    successMessage = event.message
+                    showSuccessPopup = true
+                }
                 else -> Unit
             }
         }
@@ -86,6 +108,7 @@ fun MemberDetailScreen(
         showSuccessPopup = showSuccessPopup,
         successMessage = successMessage,
         onUpdateMember = { viewModel.updateMember(it) },
+        onUploadImage = { bitmap -> member?.let { viewModel.uploadMemberImage(bitmap, it.id) } },
         onBack = onBack,
         onNavigateToMembers = onNavigateToMembers,
         onRenew = onRenew,
@@ -96,7 +119,6 @@ fun MemberDetailScreen(
             showSuccessPopup = false
             MemberCache.clear()
             viewModel.refreshMembers()
-            onBack() // Navigate back after success
         },
         sharedTransitionScope = sharedTransitionScope,
         animatedVisibilityScope = animatedVisibilityScope
@@ -112,6 +134,7 @@ fun MemberDetailContent(
     showSuccessPopup: Boolean,
     successMessage: String,
     onUpdateMember: (UpdateMemberRequest) -> Unit,
+    onUploadImage: (Bitmap) -> Unit,
     onBack: () -> Unit,
     onNavigateToMembers: () -> Unit,
     onRenew: (MemberUiModel) -> Unit,
@@ -123,6 +146,7 @@ fun MemberDetailContent(
     animatedVisibilityScope: AnimatedVisibilityScope
 ) {
     var isEditMode by remember { mutableStateOf(false) }
+    var showImageSourceDialog by remember { mutableStateOf(false) }
 
     // Editable fields
     var name by remember(member) { mutableStateOf(member?.name ?: "") }
@@ -136,8 +160,39 @@ fun MemberDetailContent(
     var startDate by remember(member) { mutableStateOf(member?.startDate ?: "") }
     var expiryDate by remember(member) { mutableStateOf(member?.expiryDate ?: "") }
 
+    val context = LocalContext.current
     val countries = remember {
         listOf("Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czech Republic", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Honduras", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Korea, North", "Korea, South", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe").sorted()
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        uri?.let {
+            val bitmap = try {
+                val inputStream = context.contentResolver.openInputStream(it)
+                BitmapFactory.decodeStream(inputStream)
+            } catch (e: Exception) {
+                null
+            }
+            bitmap?.let { onUploadImage(it) }
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: Bitmap? ->
+        bitmap?.let { onUploadImage(it) }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            cameraLauncher.launch()
+        } else {
+            Toast.makeText(context, "Camera permission is required to take photos", Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun isValidEmail(email: String): Boolean {
@@ -271,7 +326,9 @@ fun MemberDetailContent(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         // Profile Card Section
-                        MemberHeaderCard(it, animatedVisibilityScope, sharedTransitionScope)
+                        MemberHeaderCard(it, animatedVisibilityScope, sharedTransitionScope, onImageClick = {
+                            if (isEditMode) showImageSourceDialog = true
+                        })
 
                         Spacer(modifier = Modifier.height(24.dp))
 
@@ -378,6 +435,12 @@ fun MemberDetailContent(
                         Spacer(modifier = Modifier.height(32.dp))
                     }
 
+                    if (isLoading) {
+                        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    }
+
                     if (error != null) {
                         CenterPopup(
                             uiMessage = UiMessage(
@@ -398,6 +461,42 @@ fun MemberDetailContent(
                             ),
                             onDismiss = {
                                 onSuccessPopupDismiss()
+                            }
+                        )
+                    }
+
+                    if (showImageSourceDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showImageSourceDialog = false },
+                            title = { Text("Select Image Source") },
+                            text = {
+                                Column {
+                                    ListItem(
+                                        headlineContent = { Text("Camera") },
+                                        leadingContent = { Icon(Icons.Outlined.CameraAlt, contentDescription = null) },
+                                        modifier = Modifier.clickable {
+                                            showImageSourceDialog = false
+                                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                                                cameraLauncher.launch()
+                                            } else {
+                                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                            }
+                                        }
+                                    )
+                                    ListItem(
+                                        headlineContent = { Text("Gallery") },
+                                        leadingContent = { Icon(Icons.Outlined.PhotoLibrary, contentDescription = null) },
+                                        modifier = Modifier.clickable {
+                                            showImageSourceDialog = false
+                                            galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                        }
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { showImageSourceDialog = false }) {
+                                    Text("Cancel")
+                                }
                             }
                         )
                     }
@@ -455,7 +554,8 @@ private fun convertToApiDate(displayDate: String): String {
 fun MemberHeaderCard(
     member: MemberUiModel,
     animatedVisibilityScope: AnimatedVisibilityScope,
-    sharedTransitionScope: SharedTransitionScope
+    sharedTransitionScope: SharedTransitionScope,
+    onImageClick: () -> Unit
 ) {
     val context = LocalContext.current
     val baseUrl = "http://192.168.18.72:7001/"
@@ -482,7 +582,7 @@ fun MemberHeaderCard(
             ) {
                 // Profile Picture (Round)
                 Surface(
-                    modifier = Modifier.size(80.dp),
+                    modifier = Modifier.size(80.dp).clickable { onImageClick() },
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     border = BorderStroke(4.dp, MaterialTheme.colorScheme.surface),
@@ -842,6 +942,7 @@ fun MemberDetailScreenPreview() {
                     showSuccessPopup = false,
                     successMessage = "",
                     onUpdateMember = {},
+                    onUploadImage = {},
                     onBack = {},
                     onNavigateToMembers = {},
                     onRenew = {},

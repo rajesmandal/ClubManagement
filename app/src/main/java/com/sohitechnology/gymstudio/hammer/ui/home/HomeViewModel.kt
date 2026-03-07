@@ -2,6 +2,7 @@ package com.sohitechnology.gymstudio.hammer.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.messaging.FirebaseMessaging
 import com.sohitechnology.gymstudio.hammer.core.common.ApiResult
 import com.sohitechnology.gymstudio.hammer.core.session.AppDataStore
 import com.sohitechnology.gymstudio.hammer.core.session.SessionKeys
@@ -9,12 +10,14 @@ import com.sohitechnology.gymstudio.hammer.data.cache.HomeCache
 import com.sohitechnology.gymstudio.hammer.data.model.MemberCountData
 import com.sohitechnology.gymstudio.hammer.data.model.MemberCountRequest
 import com.sohitechnology.gymstudio.hammer.data.model.MemberExpiryRequest
+import com.sohitechnology.gymstudio.hammer.data.model.UpdateFcmTokenRequest
 import com.sohitechnology.gymstudio.hammer.data.repository.HomeRepository
 import com.sohitechnology.gymstudio.hammer.ui.member.MemberUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 @HiltViewModel
@@ -42,6 +45,32 @@ class HomeViewModel @Inject constructor(
         // Load from cache initially if available
         HomeCache.memberCount?.let { _memberCount.value = it }
         HomeCache.expiryMembers?.let { _expiryMembers.value = it }
+        
+        // Update FCM Token on home screen launch
+        updateFcmToken()
+    }
+
+    private fun updateFcmToken() {
+        viewModelScope.launch {
+            try {
+                val fcmToken = FirebaseMessaging.getInstance().token.await()
+                val companyIdStr = dataStore.readOnce(SessionKeys.COMPANY_ID, "0")
+                val companyId = companyIdStr.toIntOrNull() ?: 0
+                val userId = dataStore.readOnce(SessionKeys.USER_ID, 0)
+
+                if (fcmToken.isNotEmpty() && userId != 0 && companyId != 0) {
+                    homeRepository.updateFcmToken(
+                        UpdateFcmTokenRequest(
+                            cId = companyId,
+                            fcmToken = fcmToken,
+                            userId = userId
+                        )
+                    ).collect { /* No action needed for response */ }
+                }
+            } catch (e: Exception) {
+                // Silently fail for token update
+            }
+        }
     }
 
     fun getMemberCount(forceRefresh: Boolean = false) {

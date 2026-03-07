@@ -39,7 +39,8 @@ data class ReportState(
     val transactionEndDate: String = "",
     val selectedClubId: Int = 0,
     val selectedMemberId: String = "0",
-    val selectedTransactionMemberId: Int = 0
+    val selectedTransactionMemberId: Int = 0,
+    val selectedTransactionClubId: Int = 0
 )
 
 @HiltViewModel
@@ -131,19 +132,13 @@ class ReportViewModel @Inject constructor(
         }
     }
 
-    fun getTransactions(memberId: Int, startDate: String, endDate: String, forceRefresh: Boolean = false) {
-        // Fix: Properly check cache and forced refresh
+    fun getTransactions(clubId: Int, memberId: Int, startDate: String, endDate: String, forceRefresh: Boolean = false) {
         if (!forceRefresh && ReportCache.transactions != null) {
             return
         }
 
-        // Only hit API if a member is selected or it's a forced refresh
-        if (!forceRefresh && memberId == 0) {
-            if (ReportCache.transactions == null) ReportCache.transactions = emptyList()
-            return
-        }
-
-        _state.update { it.copy(selectedTransactionMemberId = memberId, transactionStartDate = startDate, transactionEndDate = endDate) }
+        // 0 is "All", so it is now a valid selection to trigger API call
+        _state.update { it.copy(selectedTransactionClubId = clubId, selectedTransactionMemberId = memberId, transactionStartDate = startDate, transactionEndDate = endDate) }
         viewModelScope.launch {
             val companyIdStr = dataStore.readOnce(SessionKeys.COMPANY_ID, "0")
             val companyId = companyIdStr.toIntOrNull() ?: 0
@@ -152,7 +147,8 @@ class ReportViewModel @Inject constructor(
                 cId = companyId,
                 id = memberId,
                 startDate = formatDateForApi(startDate),
-                endDate = formatDateForApi(endDate)
+                endDate = formatDateForApi(endDate),
+                clubId = clubId
             )
             reportRepository.getTransactions(request).collect { result ->
                 when (result) {

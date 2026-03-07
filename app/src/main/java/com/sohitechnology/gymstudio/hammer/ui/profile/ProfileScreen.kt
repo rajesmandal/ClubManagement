@@ -1,10 +1,19 @@
 package com.sohitechnology.gymstudio.hammer.ui.profile
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.net.Uri
 import android.os.Build
+import android.provider.MediaStore
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.launch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,6 +50,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.sohitechnology.gymstudio.hammer.core.NavigationEvent
 import com.sohitechnology.gymstudio.hammer.core.NavigationManager
+import com.sohitechnology.gymstudio.hammer.core.util.ImageUtil
 import com.sohitechnology.gymstudio.hammer.navigation.AppBottomBar
 import com.sohitechnology.gymstudio.hammer.navigation.MainRoute
 import com.sohitechnology.gymstudio.hammer.ui.UiMessage
@@ -149,6 +159,7 @@ fun ProfileScreen(
         onUpdateProfile = { name, email, contact, address, country, company ->
             viewModel.updateProfile(name, email, contact, address, country, company)
         },
+        onUploadImage = { bitmap -> viewModel.uploadProfileImage(bitmap) },
         onLogout = { viewModel.logout() },
         onClearError = { viewModel.clearError() },
         showSuccessPopup = showSuccessPopup,
@@ -171,6 +182,7 @@ fun ProfileContent(
     onAppLockToggle: (Boolean) -> Unit,
     onUpdateCredentials: (String, String, Int) -> Unit,
     onUpdateProfile: (String, String, String, String, String, String) -> Unit,
+    onUploadImage: (Bitmap) -> Unit,
     onLogout: () -> Unit,
     onClearError: () -> Unit,
     showSuccessPopup: Boolean,
@@ -180,10 +192,47 @@ fun ProfileContent(
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var showUpdateBottomSheet by remember { mutableStateOf(false) }
     var showProfileEditSheet by remember { mutableStateOf(false) }
+    var showImageSourceDialog by remember { mutableStateOf(false) }
     
     val sheetState = rememberModalBottomSheetState()
     val editSheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        uri?.let {
+            val bitmap = try {
+                context.contentResolver.openInputStream(it)?.use { stream ->
+                    BitmapFactory.decodeStream(stream)
+                }
+            } catch (e: Exception) {
+                null
+            }
+            bitmap?.let { b ->
+                val orientation = ImageUtil.getOrientation(context, it)
+                val rotated = ImageUtil.rotateBitmap(b, orientation)
+                onUploadImage(rotated)
+            }
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: Bitmap? ->
+        bitmap?.let { onUploadImage(it) }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            cameraLauncher.launch()
+        } else {
+            Toast.makeText(context, "Camera permission is required to take photos", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -209,7 +258,7 @@ fun ProfileContent(
                     .padding(horizontal = 20.dp, vertical = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                ProfileHeader(userProfile, onEditClick = { showProfileEditSheet = true })
+                ProfileHeader(userProfile, onEditClick = { showProfileEditSheet = true }, onImageClick = { showImageSourceDialog = true })
 
                 Spacer(modifier = Modifier.height(32.dp))
 
@@ -325,6 +374,42 @@ fun ProfileContent(
                         }
                     )
                 }
+            }
+
+            if (showImageSourceDialog) {
+                AlertDialog(
+                    onDismissRequest = { showImageSourceDialog = false },
+                    title = { Text("Select Image Source") },
+                    text = {
+                        Column {
+                            ListItem(
+                                headlineContent = { Text("Camera") },
+                                leadingContent = { Icon(Icons.Outlined.CameraAlt, contentDescription = null) },
+                                modifier = Modifier.clickable {
+                                    showImageSourceDialog = false
+                                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                                        cameraLauncher.launch()
+                                    } else {
+                                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                    }
+                                }
+                            )
+                            ListItem(
+                                headlineContent = { Text("Gallery") },
+                                leadingContent = { Icon(Icons.Outlined.PhotoLibrary, contentDescription = null) },
+                                modifier = Modifier.clickable {
+                                    showImageSourceDialog = false
+                                    galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                }
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showImageSourceDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
             }
             
             if (error != null) {
@@ -462,15 +547,15 @@ fun UpdateCredentialsSheetContent(onDismiss: () -> Unit, onUpdate: (String, Stri
 }
 
 @Composable
-fun ProfileHeader(profile: UserProfile, onEditClick: () -> Unit) {
+fun ProfileHeader(profile: UserProfile, onEditClick: () -> Unit, onImageClick: () -> Unit) {
     val context = LocalContext.current
-    val baseUrl = "http://192.168.18.72:7001/"
+    val baseUrl = "https://api.gymstudio.in/"
     val imagePath = profile.profileImage
-    val fullImageUrl = if (imagePath.isNotEmpty() && !imagePath.startsWith("http")) baseUrl + imagePath.removePrefix("/") else imagePath
+    val fullImageUrl = if (imagePath.isNotEmpty() && !imagePath.startsWith("https")) baseUrl + imagePath.removePrefix("/") else imagePath
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(contentAlignment = Alignment.BottomEnd) {
-            Surface(modifier = Modifier.size(120.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, border = BorderStroke(4.dp, MaterialTheme.colorScheme.background), shadowElevation = 8.dp) {
+            Surface(modifier = Modifier.size(120.dp).clickable { onImageClick() }, shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, border = BorderStroke(4.dp, MaterialTheme.colorScheme.background), shadowElevation = 8.dp) {
                 if (imagePath.isNotEmpty()) {
                     AsyncImage(model = ImageRequest.Builder(context).data(fullImageUrl).crossfade(true).build(), contentDescription = "Profile Picture", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 } else {
@@ -555,6 +640,7 @@ fun ProfileScreenPreview() {
             onAppLockToggle = {},
             onUpdateCredentials = { _, _, _ -> },
             onUpdateProfile = { _, _, _, _, _, _ -> },
+            onUploadImage = {},
             onLogout = {},
             onClearError = {},
             showSuccessPopup = false,

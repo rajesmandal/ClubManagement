@@ -9,6 +9,8 @@ import com.sohitechnology.gymstudio.hammer.core.session.AppDataStore
 import com.sohitechnology.gymstudio.hammer.core.util.DeviceUtil
 import com.sohitechnology.gymstudio.hammer.data.model.CredentialUpdateRequest
 import com.sohitechnology.gymstudio.hammer.data.model.CredentialUpdateResponse
+import com.sohitechnology.gymstudio.hammer.data.model.ImageUploadRequest
+import com.sohitechnology.gymstudio.hammer.data.model.ImageUploadResponse
 import com.sohitechnology.gymstudio.hammer.data.model.LoginRequest
 import com.sohitechnology.gymstudio.hammer.data.model.LoginResponse
 import com.sohitechnology.gymstudio.hammer.data.model.LogoutRequest
@@ -56,6 +58,12 @@ class AuthRepository @Inject constructor(
     fun updateProfile(request: ProfileUpdateRequest): Flow<ApiResult<ProfileUpdateResponse>> {
         return apiFlow(gson) {
             api.updateProfile(request)
+        }
+    }
+
+    fun uploadImage(request: ImageUploadRequest): Flow<ApiResult<ImageUploadResponse>> {
+        return apiFlow(gson) {
+            api.uploadImage("https://img.gymstudio.in/api/image-manager/upload/image", request)
         }
     }
 }

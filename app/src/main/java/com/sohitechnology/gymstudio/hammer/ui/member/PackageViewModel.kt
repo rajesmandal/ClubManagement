@@ -22,7 +22,8 @@ data class PackageState(
     val isLoading: Boolean = false,
     val packages: List<PackageDto> = emptyList(),
     val error: String? = null,
-    val selectedPackage: PackageDto? = null
+    val selectedPackage: PackageDto? = null,
+    val selectedPaymentType: String = "UPI"
 )
 
 sealed class PackageUiEvent {
@@ -79,8 +80,14 @@ class PackageViewModel @Inject constructor(
         _state.update { it.copy(selectedPackage = pkg) }
     }
 
+    fun selectPaymentType(type: String) {
+        _state.update { it.copy(selectedPaymentType = type) }
+    }
+
     fun renewMember(memberId: String) {
         val selectedPkg = _state.value.selectedPackage ?: return
+        val paymentType = _state.value.selectedPaymentType
+        
         viewModelScope.launch {
             val companyIdStr = dataStore.readOnce(SessionKeys.COMPANY_ID, "0")
             val companyId = companyIdStr.toIntOrNull() ?: 0
@@ -88,7 +95,8 @@ class PackageViewModel @Inject constructor(
             val request = MemberRenewRequest(
                 cId = companyId,
                 memberData = memberId,
-                planData = (selectedPkg.id ?: 0).toString()
+                planData = (selectedPkg.id ?: 0).toString(),
+                paymentType = paymentType
             )
             
             repository.renewMember(request).collect { result ->

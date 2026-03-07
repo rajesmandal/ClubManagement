@@ -68,8 +68,8 @@ fun ReportTabScreen(
         onGetReports = { clubId, memberIds, start, end, force ->
             viewModel.getReports(clubId, memberIds, start, end, force)
         },
-        onGetTransactions = { memberId, start, end, force ->
-            viewModel.getTransactions(memberId, start, end, force)
+        onGetTransactions = { clubId, memberId, start, end, force ->
+            viewModel.getTransactions(clubId, memberId, start, end, force)
         }
     )
 }
@@ -83,7 +83,7 @@ fun ReportTabContent(
     onMenuClick: () -> Unit,
     onLoadMembers: (Int) -> Unit,
     onGetReports: (String, String, String, String, Boolean) -> Unit,
-    onGetTransactions: (Int, String, String, Boolean) -> Unit
+    onGetTransactions: (Int, Int, String, String, Boolean) -> Unit
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Report", "Transaction")
@@ -104,6 +104,7 @@ fun ReportTabContent(
         )
         
         onGetTransactions(
+            state.selectedTransactionClubId,
             state.selectedTransactionMemberId, 
             state.transactionStartDate, 
             state.transactionEndDate,
@@ -241,7 +242,7 @@ fun TransactionScreenContent(
     state: ReportState,
     clubs: List<DropdownItem>,
     onLoadMembers: (Int) -> Unit,
-    onGetTransactions: (Int, String, String, Boolean) -> Unit
+    onGetTransactions: (Int, Int, String, String, Boolean) -> Unit
 ) {
     var showFilterDialog by remember { mutableStateOf(false) }
 
@@ -250,6 +251,7 @@ fun TransactionScreenContent(
             isRefreshing = state.isLoading,
             onRefresh = {
                 onGetTransactions(
+                    state.selectedTransactionClubId,
                     state.selectedTransactionMemberId,
                     state.transactionStartDate,
                     state.transactionEndDate,
@@ -286,7 +288,7 @@ fun TransactionScreenContent(
                 if (state.transactions.isEmpty() && !state.isLoading) {
                     EmptyState(
                         title = "No Transactions Found",
-                        description = "Select a member to see transaction history."
+                        description = "Adjust filters to see transaction history."
                     )
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
@@ -314,7 +316,7 @@ fun TransactionScreenContent(
         TransactionFilterDialog(
             clubs = clubs,
             members = state.members,
-            initialClubId = state.selectedClubId,
+            initialClubId = state.selectedTransactionClubId,
             initialMemberId = state.selectedTransactionMemberId,
             initialStartDate = state.transactionStartDate,
             initialEndDate = state.transactionEndDate,
@@ -322,8 +324,8 @@ fun TransactionScreenContent(
             onClubSelected = { clubId ->
                 onLoadMembers(clubId)
             },
-            onApply = { memberId, start, end ->
-                onGetTransactions(memberId, start, end, true) // Force hit API when filter is applied
+            onApply = { clubId, memberId, start, end ->
+                onGetTransactions(clubId, memberId, start, end, true) // Force hit API when filter is applied
                 showFilterDialog = false
             }
         )
@@ -476,7 +478,7 @@ fun TransactionFilterDialog(
     initialEndDate: String,
     onDismiss: () -> Unit,
     onClubSelected: (Int) -> Unit,
-    onApply: (Int, String, String) -> Unit
+    onApply: (Int, Int, String, String) -> Unit
 ) {
     var clubId by remember { mutableIntStateOf(initialClubId) }
     var selectedMemberId by remember { mutableIntStateOf(initialMemberId) }
@@ -526,7 +528,7 @@ fun TransactionFilterDialog(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            val selectedMemberName = sortedMembers.find { it.id == selectedMemberId }?.name ?: "Select Member"
+                            val selectedMemberName = if (selectedMemberId == 0) "All" else sortedMembers.find { it.id == selectedMemberId }?.name ?: "All"
                             Text(selectedMemberName, style = MaterialTheme.typography.bodyMedium)
                             Icon(
                                 if (isMemberDropdownExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
@@ -543,6 +545,17 @@ fun TransactionFilterDialog(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
                         LazyColumn {
+                            item {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().clickable {
+                                        selectedMemberId = 0
+                                        isMemberDropdownExpanded = false
+                                    }.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("All", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                                }
+                            }
                             items(sortedMembers) { member ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth().clickable {
@@ -569,8 +582,7 @@ fun TransactionFilterDialog(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text("Cancel") }
                     Button(
-                        onClick = { onApply(selectedMemberId, start, end) },
-                        enabled = selectedMemberId != 0
+                        onClick = { onApply(clubId, selectedMemberId, start, end) }
                     ) { Text("Apply", color = Color.Black) }
                 }
             }
@@ -779,6 +791,14 @@ fun TransactionItem(transaction: TransactionData) {
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (!transaction.memberId.isNullOrEmpty()) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "ID: ${transaction.memberId}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
                     Text(
                         text = transaction.planName ?: "No Plan",
                         style = MaterialTheme.typography.bodyMedium,
@@ -878,7 +898,8 @@ fun ReportTabScreenPreview() {
             startDate = "01/01/2024",
             expiryDate = "31/12/2024",
             validity = "4",
-            validityType = "Year"
+            validityType = "Year",
+            memberId = "6766"
         )
     )
 
@@ -899,7 +920,7 @@ fun ReportTabScreenPreview() {
             onMenuClick = {},
             onLoadMembers = {},
             onGetReports = { _, _, _, _, _ -> },
-            onGetTransactions = { _, _, _, _ -> }
+            onGetTransactions = { _, _, _, _, _ -> }
         )
     }
 }

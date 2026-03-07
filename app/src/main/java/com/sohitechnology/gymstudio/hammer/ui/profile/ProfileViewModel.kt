@@ -1,5 +1,7 @@
 package com.sohitechnology.gymstudio.hammer.ui.profile
 
+import android.content.Context
+import android.graphics.Bitmap
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -8,12 +10,15 @@ import androidx.lifecycle.viewModelScope
 import com.sohitechnology.gymstudio.hammer.core.common.ApiResult
 import com.sohitechnology.gymstudio.hammer.core.session.AppDataStore
 import com.sohitechnology.gymstudio.hammer.core.session.SessionKeys
-import com.sohitechnology.gymstudio.hammer.data.repository.AuthRepository
+import com.sohitechnology.gymstudio.hammer.core.util.ImageUtil
 import com.sohitechnology.gymstudio.hammer.data.model.CredentialUpdateRequest
+import com.sohitechnology.gymstudio.hammer.data.model.ImageUploadRequest
 import com.sohitechnology.gymstudio.hammer.data.model.LogoutRequest
 import com.sohitechnology.gymstudio.hammer.data.model.ProfileRequest
 import com.sohitechnology.gymstudio.hammer.data.model.ProfileUpdateRequest
+import com.sohitechnology.gymstudio.hammer.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -41,7 +46,8 @@ data class UserProfile(
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val dataStore: AppDataStore
+    private val dataStore: AppDataStore,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _userProfile = MutableStateFlow(UserProfile())
@@ -116,6 +122,55 @@ class ProfileViewModel @Inject constructor(
                     is ApiResult.Loading -> { }
                 }
             }
+        }
+    }
+
+    fun uploadProfileImage(bitmap: Bitmap) {
+        viewModelScope.launch {
+            isLoading = true
+            error = null
+            
+            val base64String = ImageUtil.compressAndEncodeToBase64(context, bitmap)
+            
+            if (base64String == null) {
+                error = "Failed to process image"
+                isLoading = false
+                return@launch
+            }
+
+            val companyId = dataStore.readOnce(SessionKeys.COMPANY_ID, "0").toIntOrNull() ?: 0
+            val userId = dataStore.readOnce(SessionKeys.USER_ID, 0)
+
+            val request = ImageUploadRequest(
+                cId = companyId,
+                folderName = "UserImage",
+                base64Strings = base64String,
+                fileName = "$userId-$companyId",
+                fileType = "image/jpeg",
+                imgKey = "liikolmnbyKhJ7E/BHocqyfX4POWmedEOgsTKJDh/aE="
+            )
+
+            authRepository.uploadImage(request).collect { result ->
+                when (result) {
+                    is ApiResult.Success -> {
+                        if (result.data.success == true) {
+                            val newImageUrl = "https://img.gymstudio.in/${dataStore.readOnce(SessionKeys.COMPANY_ID, "0").toIntOrNull() ?: 0}/UserImage/${result.data.data.imageName}"
+                            _userProfile.update { it.copy(profileImage = newImageUrl) }
+                            dataStore.save(SessionKeys.PROFILE_IMAGE, newImageUrl)
+                            _profileUpdateSuccess.emit(result.data.message ?: "Image uploaded successfully")
+                        } else {
+                            error = result.data.message ?: "Image upload failed"
+                        }
+                    }
+                    is ApiResult.Error -> {
+                        error = result.message
+                    }
+                    is ApiResult.Loading -> {
+                        isLoading = true
+                    }
+                }
+            }
+            isLoading = false
         }
     }
 

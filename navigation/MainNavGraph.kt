@@ -17,6 +17,9 @@ import com.sohitechnology.clubmanagement.ui.member.MemberViewModel
 import com.sohitechnology.clubmanagement.ui.member.PackageSelectionScreen
 import com.sohitechnology.clubmanagement.ui.member.PackageViewModel
 import com.sohitechnology.clubmanagement.ui.report.ReportTabScreen
+import java.net.URLDecoder
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 fun NavGraphBuilder.mainNavGraph(
@@ -82,7 +85,8 @@ fun NavGraphBuilder.mainNavGraph(
                     navController.popBackStack(MainRoute.Members.route, inclusive = false)
                 },
                 onRenew = { member ->
-                    navController.navigate("${MainRoute.PackageSelection.route}/${member.memberId}/${member.expiryDate}")
+                    val encodedExpiryDate = URLEncoder.encode(member.expiryDate, StandardCharsets.UTF_8.toString())
+                    navController.navigate("${MainRoute.PackageSelection.route}/${member.memberId}/$encodedExpiryDate")
                 },
                 sharedTransitionScope = sharedTransitionScope,
                 animatedVisibilityScope = this@composable
@@ -109,7 +113,9 @@ fun NavGraphBuilder.mainNavGraph(
 
     composable("${MainRoute.PackageSelection.route}/{memberId}/{expiryDate}") { backStackEntry ->
         val memberId = backStackEntry.arguments?.getString("memberId") ?: ""
-        val expiryDate = backStackEntry.arguments?.getString("expiryDate") ?: ""
+        val expiryDate = backStackEntry.arguments?.getString("expiryDate")?.let {
+            URLDecoder.decode(it, StandardCharsets.UTF_8.toString())
+        } ?: ""
         val viewModel: PackageViewModel = hiltViewModel()
 
         PackageSelectionScreen(

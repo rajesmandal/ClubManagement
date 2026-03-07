@@ -6,6 +6,8 @@ import com.sohitechnology.gymstudio.hammer.data.model.ClubRequest
 import com.sohitechnology.gymstudio.hammer.data.model.ClubResponse
 import com.sohitechnology.gymstudio.hammer.data.model.CredentialUpdateRequest
 import com.sohitechnology.gymstudio.hammer.data.model.CredentialUpdateResponse
+import com.sohitechnology.gymstudio.hammer.data.model.ImageUploadRequest
+import com.sohitechnology.gymstudio.hammer.data.model.ImageUploadResponse
 import com.sohitechnology.gymstudio.hammer.data.model.LoginRequest
 import com.sohitechnology.gymstudio.hammer.data.model.LoginResponse
 import com.sohitechnology.gymstudio.hammer.data.model.LogoutRequest
@@ -28,10 +30,13 @@ import com.sohitechnology.gymstudio.hammer.data.model.ReportRequest
 import com.sohitechnology.gymstudio.hammer.data.model.ReportResponse
 import com.sohitechnology.gymstudio.hammer.data.model.TransactionRequest
 import com.sohitechnology.gymstudio.hammer.data.model.TransactionResponse
+import com.sohitechnology.gymstudio.hammer.data.model.UpdateFcmTokenRequest
+import com.sohitechnology.gymstudio.hammer.data.model.UpdateFcmTokenResponse
 import com.sohitechnology.gymstudio.hammer.data.model.UpdateMemberRequest
 import com.sohitechnology.gymstudio.hammer.data.model.UpdateMemberResponse
 import retrofit2.http.Body
 import retrofit2.http.POST
+import retrofit2.http.Url
 
 interface ApiService {
 
@@ -81,4 +86,10 @@ interface ApiService {
 
     @POST("/api/admin/or/staff/credential/update")
     suspend fun updateCredential(@Body credentialUpdateRequest: CredentialUpdateRequest): CredentialUpdateResponse
+
+    @POST("/api/admin/or/staff/update/fcm-token")
+    suspend fun updateFcmToken(@Body updateFcmTokenRequest: UpdateFcmTokenRequest): UpdateFcmTokenResponse
+
+    @POST
+    suspend fun uploadImage(@Url url: String, @Body request: ImageUploadRequest): ImageUploadResponse
 }

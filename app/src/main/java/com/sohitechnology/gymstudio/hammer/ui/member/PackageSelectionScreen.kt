@@ -1,9 +1,12 @@
 package com.sohitechnology.gymstudio.hammer.ui.member
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -27,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -42,6 +47,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.sohitechnology.gymstudio.hammer.data.cache.HomeCache
+import com.sohitechnology.gymstudio.hammer.data.cache.MemberCache
 import com.sohitechnology.gymstudio.hammer.data.model.PackageDto
 import com.sohitechnology.gymstudio.hammer.ui.UiMessage
 import com.sohitechnology.gymstudio.hammer.ui.UiMessageType
@@ -70,6 +77,10 @@ fun PackageSelectionScreen(
     LaunchedEffect(Unit) {
         viewModel.event.collect { event ->
             if (event is PackageUiEvent.RenewSuccess) {
+                // Clear caches so Home and Member screens fetch fresh data
+                HomeCache.clear()
+                MemberCache.clear()
+
                 successMessage = event.message
                 showSuccessPopup = true
             }
@@ -130,6 +141,8 @@ fun PackageSelectionScreen(
                         pkg = state.selectedPackage!!,
                         currentExpiry = memberExpiryDate,
                         isLoading = state.isLoading,
+                        selectedPaymentType = state.selectedPaymentType,
+                        onPaymentTypeSelect = { viewModel.selectPaymentType(it) },
                         onConfirm = {
                             viewModel.renewMember(memberId)
                         }
@@ -213,14 +226,18 @@ fun PackageItem(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RenewalSummary(
     pkg: PackageDto,
     currentExpiry: String,
     isLoading: Boolean,
+    selectedPaymentType: String,
+    onPaymentTypeSelect: (String) -> Unit,
     onConfirm: () -> Unit
 ) {
     val newExpiry = calculateNewExpiryDate(currentExpiry, pkg.validation ?: 0)
+    val paymentTypes = listOf("UPI", "Cash", "Bank Transfer", "Card")
 
     Column(
         modifier = Modifier
@@ -241,6 +258,29 @@ fun RenewalSummary(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        Text(
+            text = "Payment Method",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            paymentTypes.forEach { type ->
+                PaymentTypeChip(
+                    text = type,
+                    isSelected = selectedPaymentType == type,
+                    onSelect = { onPaymentTypeSelect(type) }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
         Button(
             onClick = onConfirm,
             modifier = Modifier.fillMaxWidth(),
@@ -253,6 +293,28 @@ fun RenewalSummary(
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+@Composable
+fun PaymentTypeChip(
+    text: String,
+    isSelected: Boolean,
+    onSelect: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.clickable { onSelect() },
+        shape = RoundedCornerShape(50.dp),
+        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+        border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+        contentColor = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurface
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+        )
     }
 }
 
@@ -275,11 +337,35 @@ fun SummaryRow(label: String, value: String, valueColor: Color = Color.Unspecifi
 }
 
 fun calculateNewExpiryDate(currentExpiry: String, validationDays: Int): String {
-    val sdf = SimpleDateFormat("dd-MM-yyyy", Locale.getDefault())
+    val formats = listOf("dd-MM-yyyy", "dd/MM/yyyy", "yyyy-MM-dd", "yyyy/MM/dd")
+    var parsedDate: Date? = null
+    var usedFormat = "dd-MM-yyyy"
+
+    for (format in formats) {
+        try {
+            val sdf = SimpleDateFormat(format, Locale.getDefault())
+            parsedDate = sdf.parse(currentExpiry)
+            if (parsedDate != null) {
+                usedFormat = format
+                break
+            }
+        } catch (e: Exception) {
+            continue
+        }
+    }
+
     return try {
-        val date = sdf.parse(currentExpiry) ?: Date()
+        val sdf = SimpleDateFormat(usedFormat, Locale.getDefault())
+        val date = parsedDate ?: Date()
         val calendar = Calendar.getInstance()
-        calendar.time = date
+        
+        // If current expiry is in the past, start from today
+        if (date.before(Date())) {
+            calendar.time = Date()
+        } else {
+            calendar.time = date
+        }
+
         calendar.add(Calendar.DAY_OF_YEAR, validationDays)
         sdf.format(calendar.time)
     } catch (e: Exception) {

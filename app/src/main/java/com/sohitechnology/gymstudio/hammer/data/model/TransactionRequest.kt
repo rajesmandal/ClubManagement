@@ -4,5 +4,6 @@ data class TransactionRequest(
     val cId: Int,
     val id: Int,
     val startDate: String,
-    val endDate: String
+    val endDate: String,
+    val clubId: Int
 )
