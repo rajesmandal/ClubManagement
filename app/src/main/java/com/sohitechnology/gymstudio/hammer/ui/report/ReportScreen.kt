@@ -70,7 +70,8 @@ fun ReportTabScreen(
         },
         onGetTransactions = { clubId, memberId, start, end, force ->
             viewModel.getTransactions(clubId, memberId, start, end, force)
-        }
+        },
+        role = if (state.isAdmin) "admin" else "member"
     )
 }
 
@@ -83,24 +84,25 @@ fun ReportTabContent(
     onMenuClick: () -> Unit,
     onLoadMembers: (Int) -> Unit,
     onGetReports: (String, String, String, String, Boolean) -> Unit,
-    onGetTransactions: (Int, Int, String, String, Boolean) -> Unit
+    onGetTransactions: (Int, Int, String, String, Boolean) -> Unit,
+    role: String
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Report", "Transaction")
 
     // Initial Data Load
-    LaunchedEffect(Unit) {
-        if (state.members.isEmpty()) {
+    LaunchedEffect(state.isAdmin) {
+        if (state.isAdmin && state.members.isEmpty()) {
             onLoadMembers(0)
         }
         
-        // Attempt to load from cache or API on first entry
+        // Initial reports/transactions fetch
         onGetReports(
             state.selectedClubId.toString(), 
             state.selectedMemberId, 
             state.startDate, 
             state.endDate,
-            false // Don't force refresh, check cache first
+            false 
         )
         
         onGetTransactions(
@@ -108,7 +110,7 @@ fun ReportTabContent(
             state.selectedTransactionMemberId, 
             state.transactionStartDate, 
             state.transactionEndDate,
-            false // Don't force refresh, check cache first
+            false 
         )
     }
 
@@ -124,7 +126,8 @@ fun ReportTabContent(
         },
         bottomBar = {
             AppBottomBar(
-                navController
+                navController,
+                role = role
             )
         }
     ) { paddingValues ->
@@ -178,7 +181,7 @@ fun ReportScreenContent(
                     state.selectedMemberId,
                     state.startDate,
                     state.endDate,
-                    true // Force hit API on refresh
+                    true 
                 )
             },
             modifier = Modifier.fillMaxSize()
@@ -186,7 +189,7 @@ fun ReportScreenContent(
             if (state.reports.isEmpty() && !state.isLoading) {
                 EmptyState(
                     title = "No Reports Found",
-                    description = "Apply filters to see check-in/out reports."
+                    description = if (state.isAdmin) "Apply filters to see check-in/out reports." else "No check-in/out activity recorded yet."
                 )
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
@@ -210,29 +213,42 @@ fun ReportScreenContent(
     }
 
     if (showFilterDialog) {
-        ReportFilterDialog(
-            clubs = clubs,
-            members = state.members,
-            initialClubId = state.selectedClubId,
-            initialMemberIds = state.selectedMemberId.split(",").toSet(),
-            initialStartDate = state.startDate,
-            initialEndDate = state.endDate,
-            onDismiss = { showFilterDialog = false },
-            onClubSelected = { clubId ->
-                onLoadMembers(clubId)
-            },
-            onApply = { clubId, memberIds, start, end ->
-                val memberIdsParam = if (memberIds.contains("0") || memberIds.isEmpty()) "0" else memberIds.joinToString(",")
-                onGetReports(
-                    clubId.toString(),
-                    memberIdsParam,
-                    start,
-                    end,
-                    true // Force hit API when filter is applied
-                )
-                showFilterDialog = false
-            }
-        )
+        if (state.isAdmin) {
+            ReportFilterDialog(
+                clubs = clubs,
+                members = state.members,
+                initialClubId = state.selectedClubId,
+                initialMemberIds = state.selectedMemberId.split(",").toSet(),
+                initialStartDate = state.startDate,
+                initialEndDate = state.endDate,
+                onDismiss = { showFilterDialog = false },
+                onClubSelected = { clubId ->
+                    onLoadMembers(clubId)
+                },
+                onApply = { clubId, memberIds, start, end ->
+                    val memberIdsParam = if (memberIds.contains("0") || memberIds.isEmpty()) "0" else memberIds.joinToString(",")
+                    onGetReports(
+                        clubId.toString(),
+                        memberIdsParam,
+                        start,
+                        end,
+                        true 
+                    )
+                    showFilterDialog = false
+                }
+            )
+        } else {
+            MemberDateFilterDialog(
+                title = "Report Date Filter",
+                initialStartDate = state.startDate,
+                initialEndDate = state.endDate,
+                onDismiss = { showFilterDialog = false },
+                onApply = { start, end ->
+                    onGetReports("0", "0", start, end, true)
+                    showFilterDialog = false
+                }
+            )
+        }
     }
 }
 
@@ -255,7 +271,7 @@ fun TransactionScreenContent(
                     state.selectedTransactionMemberId,
                     state.transactionStartDate,
                     state.transactionEndDate,
-                    true // Force hit API on refresh
+                    true 
                 )
             },
             modifier = Modifier.fillMaxSize()
@@ -288,7 +304,7 @@ fun TransactionScreenContent(
                 if (state.transactions.isEmpty() && !state.isLoading) {
                     EmptyState(
                         title = "No Transactions Found",
-                        description = "Adjust filters to see transaction history."
+                        description = if (state.isAdmin) "Adjust filters to see transaction history." else "No transaction history found."
                     )
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
@@ -313,22 +329,72 @@ fun TransactionScreenContent(
     }
 
     if (showFilterDialog) {
-        TransactionFilterDialog(
-            clubs = clubs,
-            members = state.members,
-            initialClubId = state.selectedTransactionClubId,
-            initialMemberId = state.selectedTransactionMemberId,
-            initialStartDate = state.transactionStartDate,
-            initialEndDate = state.transactionEndDate,
-            onDismiss = { showFilterDialog = false },
-            onClubSelected = { clubId ->
-                onLoadMembers(clubId)
-            },
-            onApply = { clubId, memberId, start, end ->
-                onGetTransactions(clubId, memberId, start, end, true) // Force hit API when filter is applied
-                showFilterDialog = false
+        if (state.isAdmin) {
+            TransactionFilterDialog(
+                clubs = clubs,
+                members = state.members,
+                initialClubId = state.selectedTransactionClubId,
+                initialMemberId = state.selectedTransactionMemberId,
+                initialStartDate = state.transactionStartDate,
+                initialEndDate = state.transactionEndDate,
+                onDismiss = { showFilterDialog = false },
+                onClubSelected = { clubId ->
+                    onLoadMembers(clubId)
+                },
+                onApply = { clubId, memberId, start, end ->
+                    onGetTransactions(clubId, memberId, start, end, true) 
+                    showFilterDialog = false
+                }
+            )
+        } else {
+            MemberDateFilterDialog(
+                title = "Transaction Date Filter",
+                initialStartDate = state.transactionStartDate,
+                initialEndDate = state.transactionEndDate,
+                onDismiss = { showFilterDialog = false },
+                onApply = { start, end ->
+                    onGetTransactions(0, 0, start, end, true)
+                    showFilterDialog = false
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun MemberDateFilterDialog(
+    title: String,
+    initialStartDate: String,
+    initialEndDate: String,
+    onDismiss: () -> Unit,
+    onApply: (String, String) -> Unit
+) {
+    var start by remember { mutableStateOf(initialStartDate) }
+    var end by remember { mutableStateOf(initialEndDate) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            shape = MaterialTheme.shapes.large
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(16.dp))
+
+                DatePickerField(label = "Start Date", date = start) { start = it }
+                Spacer(Modifier.height(8.dp))
+                DatePickerField(label = "End Date", date = end) { end = it }
+
+                Spacer(Modifier.height(24.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    Button(
+                        onClick = { onApply(start, end) }
+                    ) { Text("Apply", color = Color.Black) }
+                }
             }
-        )
+        }
     }
 }
 
@@ -351,7 +417,6 @@ fun ReportFilterDialog(
     var end by remember { mutableStateOf(initialEndDate) }
     var isMemberDropdownExpanded by remember { mutableStateOf(false) }
 
-    // Case-insensitive A-Z sorting for member names
     val sortedMembers = remember(members) { 
         members.sortedBy { it.name.lowercase() } 
     }
@@ -486,7 +551,6 @@ fun TransactionFilterDialog(
     var end by remember { mutableStateOf(initialEndDate) }
     var isMemberDropdownExpanded by remember { mutableStateOf(false) }
 
-    // Case-insensitive A-Z sorting for member names
     val sortedMembers = remember(members) { 
         members.sortedBy { it.name.lowercase() } 
     }
@@ -650,7 +714,6 @@ fun ReportItem(report: ReportData) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    // Profile Picture (Round)
                     Surface(
                         modifier = Modifier.size(48.dp),
                         shape = CircleShape,
@@ -707,7 +770,6 @@ fun ReportItem(report: ReportData) {
                     }
                 }
 
-                // Punch Type Chip
                 val punchName = (report.punchName ?: "").lowercase()
                 val isPunchIn = punchName.contains("in")
                 val statusColor = if (isPunchIn) Color(0xFF10B981) else Color(0xFFEF4444)
@@ -806,12 +868,28 @@ fun TransactionItem(transaction: TransactionData) {
                         fontWeight = FontWeight.Medium
                     )
                 }
-                Text(
-                    text = "₹${transaction.price ?: 0}",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = Color(0xFF10B981),
-                    fontWeight = FontWeight.Black
-                )
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "₹${transaction.price ?: 0}",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color(0xFF10B981),
+                        fontWeight = FontWeight.Black
+                    )
+                    if (!transaction.paymentType.isNullOrEmpty()) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = transaction.paymentType,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
             }
             
             Spacer(Modifier.height(12.dp))
@@ -876,17 +954,6 @@ fun ReportTabScreenPreview() {
             punchName = "Punch In",
             temperatureValue = "36.5",
             userImage = ""
-        ),
-        ReportData(
-            checkTime = "06:00 PM",
-            clubName = "Main Club",
-            location = "Main Entrance",
-            maskValue = 1,
-            memberId = "M002",
-            memberName = "Jane Smith",
-            punchName = "Punch Out",
-            temperatureValue = "36.7",
-            userImage = ""
         )
     )
     
@@ -899,7 +966,8 @@ fun ReportTabScreenPreview() {
             expiryDate = "31/12/2024",
             validity = "4",
             validityType = "Year",
-            memberId = "6766"
+            memberId = "6766",
+            paymentType = "UPI"
         )
     )
 
@@ -909,7 +977,8 @@ fun ReportTabScreenPreview() {
         totalAmount = 5000,
         totalCount = 1,
         startDate = "01/01/2024",
-        endDate = "01/01/2024"
+        endDate = "01/01/2024",
+        isAdmin = false
     )
 
     ClubManagementTheme {
@@ -920,7 +989,8 @@ fun ReportTabScreenPreview() {
             onMenuClick = {},
             onLoadMembers = {},
             onGetReports = { _, _, _, _, _ -> },
-            onGetTransactions = { _, _, _, _, _ -> }
+            onGetTransactions = { _, _, _, _, _ -> },
+            role = "admin"
         )
     }
 }

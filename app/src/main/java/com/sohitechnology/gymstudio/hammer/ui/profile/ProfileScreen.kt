@@ -164,7 +164,8 @@ fun ProfileScreen(
         onClearError = { viewModel.clearError() },
         showSuccessPopup = showSuccessPopup,
         successMessage = successMessage,
-        onDismissSuccessPopup = { showSuccessPopup = false }
+        onDismissSuccessPopup = { showSuccessPopup = false },
+        role = userProfile.role
     )
 }
 
@@ -187,7 +188,8 @@ fun ProfileContent(
     onClearError: () -> Unit,
     showSuccessPopup: Boolean,
     successMessage: String,
-    onDismissSuccessPopup: () -> Unit
+    onDismissSuccessPopup: () -> Unit,
+    role: String
 ) {
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var showUpdateBottomSheet by remember { mutableStateOf(false) }
@@ -246,7 +248,8 @@ fun ProfileContent(
         },
         bottomBar = {
             AppBottomBar(
-                navController
+                navController,
+                role = role
             )
         }
     ) { paddingValues ->
@@ -645,7 +648,8 @@ fun ProfileScreenPreview() {
             onClearError = {},
             showSuccessPopup = false,
             successMessage = "",
-            onDismissSuccessPopup = {}
+            onDismissSuccessPopup = {},
+            role = "admin"
         )
     }
 }

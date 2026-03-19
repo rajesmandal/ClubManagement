@@ -40,7 +40,7 @@ import retrofit2.http.Url
 
 interface ApiService {
 
-    @POST("api/admin/or/staff/login") // login endpoint
+    @POST("api/admin/or/staff/login") // admin login endpoint
     suspend fun login(@Body request: LoginRequest): LoginResponse
 
     @POST("/api/admin/or/staff/get/member") // member list endpoint
@@ -92,4 +92,5 @@ interface ApiService {
 
     @POST
     suspend fun uploadImage(@Url url: String, @Body request: ImageUploadRequest): ImageUploadResponse
+
 }

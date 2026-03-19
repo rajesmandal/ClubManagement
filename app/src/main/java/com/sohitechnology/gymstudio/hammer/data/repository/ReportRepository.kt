@@ -3,7 +3,9 @@ package com.sohitechnology.gymstudio.hammer.data.repository
 import com.google.gson.Gson
 import com.sohitechnology.gymstudio.hammer.core.common.ApiResult
 import com.sohitechnology.gymstudio.hammer.core.network.ApiService
+import com.sohitechnology.gymstudio.hammer.core.network.UserApiService
 import com.sohitechnology.gymstudio.hammer.core.network.safeApiCall
+import com.sohitechnology.gymstudio.hammer.data.model.MemberReportRequest
 import com.sohitechnology.gymstudio.hammer.data.model.ReportRequest
 import com.sohitechnology.gymstudio.hammer.data.model.ReportResponse
 import com.sohitechnology.gymstudio.hammer.data.model.TransactionRequest
@@ -16,6 +18,7 @@ import javax.inject.Inject
 
 class ReportRepository @Inject constructor(
     private val api: ApiService,
+    private val userApi: UserApiService,
     private val gson: Gson
 ) {
     fun getReports(request: ReportRequest): Flow<ApiResult<ReportResponse>> = flow {
@@ -25,10 +28,24 @@ class ReportRepository @Inject constructor(
         })
     }.flowOn(Dispatchers.IO)
 
+    fun getMemberReports(request: MemberReportRequest): Flow<ApiResult<ReportResponse>> = flow {
+        emit(ApiResult.Loading)
+        emit(safeApiCall(gson) {
+            userApi.getReport(request)
+        })
+    }.flowOn(Dispatchers.IO)
+
     fun getTransactions(request: TransactionRequest): Flow<ApiResult<TransactionResponse>> = flow {
         emit(ApiResult.Loading)
         emit(safeApiCall(gson) {
             api.transaction(request)
+        })
+    }.flowOn(Dispatchers.IO)
+
+    fun getMemberTransactions(request: TransactionRequest): Flow<ApiResult<TransactionResponse>> = flow {
+        emit(ApiResult.Loading)
+        emit(safeApiCall(gson) {
+            userApi.getTransactions(request)
         })
     }.flowOn(Dispatchers.IO)
 }

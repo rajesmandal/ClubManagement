@@ -6,6 +6,7 @@ import com.sohitechnology.gymstudio.hammer.core.common.ApiResult
 import com.sohitechnology.gymstudio.hammer.core.session.AppDataStore
 import com.sohitechnology.gymstudio.hammer.core.session.SessionKeys
 import com.sohitechnology.gymstudio.hammer.data.cache.ReportCache
+import com.sohitechnology.gymstudio.hammer.data.model.MemberReportRequest
 import com.sohitechnology.gymstudio.hammer.data.model.ReportData
 import com.sohitechnology.gymstudio.hammer.data.model.MemberRequest
 import com.sohitechnology.gymstudio.hammer.data.model.ReportRequest
@@ -40,7 +41,8 @@ data class ReportState(
     val selectedClubId: Int = 0,
     val selectedMemberId: String = "0",
     val selectedTransactionMemberId: Int = 0,
-    val selectedTransactionClubId: Int = 0
+    val selectedTransactionClubId: Int = 0,
+    val isAdmin: Boolean = true
 )
 
 @HiltViewModel
@@ -67,9 +69,20 @@ class ReportViewModel @Inject constructor(
                 totalCount = ReportCache.totalCount
             )
         }
+
+        checkUserRole()
+    }
+
+    private fun checkUserRole() {
+        viewModelScope.launch {
+            val role = dataStore.readOnce(SessionKeys.ROLE, "")
+            _state.update { it.copy(isAdmin = role.lowercase() != "member") }
+        }
     }
 
     fun loadMembers(clubId: Int) {
+        if (!_state.value.isAdmin) return // Member doesn't need to load other members
+
         viewModelScope.launch {
             val companyIdStr = dataStore.readOnce(SessionKeys.COMPANY_ID, "0")
             val companyId = companyIdStr.toIntOrNull() ?: 0
@@ -111,24 +124,44 @@ class ReportViewModel @Inject constructor(
         viewModelScope.launch {
             val companyIdStr = dataStore.readOnce(SessionKeys.COMPANY_ID, "0")
             val companyId = companyIdStr.toIntOrNull() ?: 0
-            val request = ReportRequest(
-                cId = companyId,
-                clubIds = clubIds,
-                startDate = formatDateForApi(startDate),
-                endDate = formatDateForApi(endDate),
-                ids = memberIds
-            )
-            reportRepository.getReports(request).collect { result ->
-                when (result) {
-                    is ApiResult.Loading -> _state.update { it.copy(isLoading = true) }
-                    is ApiResult.Success -> {
-                        val reports = result.data.data ?: emptyList()
-                        _state.update { it.copy(isLoading = false, reports = reports) }
-                        ReportCache.reports = reports
-                    }
-                    is ApiResult.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
+            
+            val isAdmin = _state.value.isAdmin
+
+            if (isAdmin) {
+                val request = ReportRequest(
+                    cId = companyId,
+                    clubIds = clubIds,
+                    startDate = formatDateForApi(startDate),
+                    endDate = formatDateForApi(endDate),
+                    ids = memberIds
+                )
+                reportRepository.getReports(request).collect { result ->
+                    handleReportResult(result)
+                }
+            } else {
+                val userId = dataStore.readOnce(SessionKeys.USER_ID, 0)
+                val request = MemberReportRequest(
+                    cId = companyId,
+                    startDate = formatDateForApi(startDate),
+                    endDate = formatDateForApi(endDate),
+                    id = userId.toString()
+                )
+                reportRepository.getMemberReports(request).collect { result ->
+                    handleReportResult(result)
                 }
             }
+        }
+    }
+
+    private fun handleReportResult(result: ApiResult<com.sohitechnology.gymstudio.hammer.data.model.ReportResponse>) {
+        when (result) {
+            is ApiResult.Loading -> _state.update { it.copy(isLoading = true) }
+            is ApiResult.Success -> {
+                val reports = result.data.data ?: emptyList()
+                _state.update { it.copy(isLoading = false, reports = reports) }
+                ReportCache.reports = reports
+            }
+            is ApiResult.Error -> _state.update { it.copy(isLoading = false, error = result.message) }
         }
     }
 
@@ -137,20 +170,30 @@ class ReportViewModel @Inject constructor(
             return
         }
 
-        // 0 is "All", so it is now a valid selection to trigger API call
         _state.update { it.copy(selectedTransactionClubId = clubId, selectedTransactionMemberId = memberId, transactionStartDate = startDate, transactionEndDate = endDate) }
         viewModelScope.launch {
             val companyIdStr = dataStore.readOnce(SessionKeys.COMPANY_ID, "0")
             val companyId = companyIdStr.toIntOrNull() ?: 0
             
+            val isAdmin = _state.value.isAdmin
+            val finalMemberId = if (isAdmin) memberId else dataStore.readOnce(SessionKeys.USER_ID, 0)
+            val finalClubId = if (isAdmin) clubId else dataStore.readOnce(SessionKeys.CLUB_ID, 0)
+
             val request = TransactionRequest(
                 cId = companyId,
-                id = memberId,
+                id = finalMemberId,
                 startDate = formatDateForApi(startDate),
                 endDate = formatDateForApi(endDate),
-                clubId = clubId
+                clubId = finalClubId
             )
-            reportRepository.getTransactions(request).collect { result ->
+
+            val transactionFlow = if (isAdmin) {
+                reportRepository.getTransactions(request)
+            } else {
+                reportRepository.getMemberTransactions(request)
+            }
+
+            transactionFlow.collect { result ->
                 when (result) {
                     is ApiResult.Loading -> _state.update { it.copy(isLoading = true) }
                     is ApiResult.Success -> {

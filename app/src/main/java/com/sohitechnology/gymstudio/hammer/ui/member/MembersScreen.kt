@@ -63,7 +63,8 @@ fun MembersScreen(
     onAddMemberClick: (Int) -> Unit,
     onMenuClick: () -> Unit,
     sharedTransitionScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    role: String = "admin"
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -82,7 +83,8 @@ fun MembersScreen(
         onAddMemberClick = onAddMemberClick,
         onMenuClick = onMenuClick,
         sharedTransitionScope = sharedTransitionScope,
-        animatedVisibilityScope = animatedVisibilityScope
+        animatedVisibilityScope = animatedVisibilityScope,
+        role = role
     )
 }
 
@@ -100,7 +102,8 @@ fun MembersContent(
     onAddMemberClick: (Int) -> Unit,
     onMenuClick: () -> Unit,
     sharedTransitionScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    role: String
 ) {
     var selectedClubId by remember { mutableStateOf(0) }
     var selectedStatus by remember { mutableStateOf(0) } // 0 = All, 1 = Active, 2 = Deactivated, 3 = Expired
@@ -137,16 +140,19 @@ fun MembersContent(
         },
         bottomBar = {
             AppBottomBar(
-                navController
+                navController,
+                role = role
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { onAddMemberClick(selectedClubId) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Member", tint = Color.Black)
+            if (role.lowercase() != "member") {
+                FloatingActionButton(
+                    onClick = { onAddMemberClick(selectedClubId) },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Member", tint = Color.Black)
+                }
             }
         }
     ) { paddingValues ->
@@ -352,7 +358,8 @@ fun MembersScreenPreview() {
                         onAddMemberClick = {},
                         onMenuClick = {},
                         sharedTransitionScope = this@SharedTransitionLayout,
-                        animatedVisibilityScope = this@AnimatedContent
+                        animatedVisibilityScope = this@AnimatedContent,
+                        role = "admin"
                     )
                 }
             }

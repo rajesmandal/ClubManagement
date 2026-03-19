@@ -11,6 +11,7 @@ object SessionKeys {
     val IS_LOGGED_IN = booleanPreferencesKey("is_logged_in")
     val COMPANY_ID = stringPreferencesKey("company_id")
     val DEVICE_ID = stringPreferencesKey("device_id") // stable device id
+    val CLUB_ID = intPreferencesKey("club_id")
 
     // app settings
     val THEME_MODE = stringPreferencesKey("theme_mode")

@@ -2,23 +2,31 @@ package com.sohitechnology.gymstudio.hammer.navigation
 
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
+import com.sohitechnology.gymstudio.hammer.core.session.AppDataStore
+import com.sohitechnology.gymstudio.hammer.core.session.SessionKeys
+import com.sohitechnology.gymstudio.hammer.ui.admin.home.AdminHomeScreen
+import com.sohitechnology.gymstudio.hammer.ui.admin.profile.AdminProfileScreen
+import com.sohitechnology.gymstudio.hammer.ui.admin.report.AdminReportViewModel
 import com.sohitechnology.gymstudio.hammer.ui.auth.BiometricAuthenticator
-import com.sohitechnology.gymstudio.hammer.ui.home.HomeScreen
 import com.sohitechnology.gymstudio.hammer.ui.member.AddMemberScreen
 import com.sohitechnology.gymstudio.hammer.ui.member.MemberDetailScreen
 import com.sohitechnology.gymstudio.hammer.ui.member.MemberViewModel
 import com.sohitechnology.gymstudio.hammer.ui.member.MembersScreen
 import com.sohitechnology.gymstudio.hammer.ui.member.PackageSelectionScreen
 import com.sohitechnology.gymstudio.hammer.ui.member.PackageViewModel
+import com.sohitechnology.gymstudio.hammer.ui.member.home.MemberHomeScreen
+import com.sohitechnology.gymstudio.hammer.ui.member.profile.MemberProfileScreen
+import com.sohitechnology.gymstudio.hammer.ui.member.report.MemberReportViewModel
 import com.sohitechnology.gymstudio.hammer.ui.notification.NotificationScreen
-import com.sohitechnology.gymstudio.hammer.ui.profile.ProfileScreen
-import com.sohitechnology.gymstudio.hammer.ui.report.ReportTabScreen
+import com.sohitechnology.gymstudio.hammer.ui.report.ReportTabContent
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -28,29 +36,38 @@ fun NavGraphBuilder.mainNavGraph(
     navController: NavHostController,
     sharedTransitionScope: SharedTransitionScope,
     onMenuClick: () -> Unit,
-    biometricAuthenticator: BiometricAuthenticator
+    biometricAuthenticator: BiometricAuthenticator,
+    dataStore: AppDataStore
 ) {
-
     navigation(
         route = MainRoute.MemberGraph.route,
         startDestination = MainRoute.Home.route
     ) {
         composable(MainRoute.Home.route) {
-            val parentEntry = remember(it) {
-                navController.getBackStackEntry(MainRoute.MemberGraph.route)
-            }
-            val memberViewModel: MemberViewModel = hiltViewModel(parentEntry)
+            val role by dataStore.read(SessionKeys.ROLE, "").collectAsState(initial = "")
+            
+            if (role.lowercase() == "member") {
+                MemberHomeScreen(
+                    navController = navController,
+                    onMenuClick = onMenuClick
+                )
+            } else {
+                val parentEntry = remember(it) {
+                    navController.getBackStackEntry(MainRoute.MemberGraph.route)
+                }
+                val memberViewModel: MemberViewModel = hiltViewModel(parentEntry)
 
-            HomeScreen(
-                navController = navController,
-                onMenuClick = onMenuClick,
-                onMemberClick = { member ->
-                    memberViewModel.selectMember(member)
-                    navController.navigate(MainRoute.MemberDetail.route)
-                },
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = this@composable
-            )
+                AdminHomeScreen(
+                    navController = navController,
+                    onMenuClick = onMenuClick,
+                    onMemberClick = { member ->
+                        memberViewModel.selectMember(member)
+                        navController.navigate(MainRoute.MemberDetail.route)
+                    },
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = this@composable
+                )
+            }
         }
 
         composable(MainRoute.Members.route) {
@@ -58,6 +75,7 @@ fun NavGraphBuilder.mainNavGraph(
                 navController.getBackStackEntry(MainRoute.MemberGraph.route)
             }
             val viewModel: MemberViewModel = hiltViewModel(parentEntry)
+            val role by dataStore.read(SessionKeys.ROLE, "").collectAsState(initial = "")
 
             MembersScreen(
                 navController = navController,
@@ -71,7 +89,8 @@ fun NavGraphBuilder.mainNavGraph(
                 },
                 onMenuClick = onMenuClick,
                 sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = this@composable
+                animatedVisibilityScope = this@composable,
+                role = role
             )
         }
 
@@ -134,7 +153,46 @@ fun NavGraphBuilder.mainNavGraph(
     }
 
     composable(MainRoute.Report.route) {
-        ReportTabScreen(navController = navController, onMenuClick = onMenuClick)
+        val role by dataStore.read(SessionKeys.ROLE, "").collectAsState(initial = "")
+        
+        if (role.lowercase() == "member") {
+            val viewModel: MemberReportViewModel = hiltViewModel()
+            val state by viewModel.state.collectAsState()
+            ReportTabContent(
+                state = state,
+                clubs = emptyList(),
+                navController = navController,
+                onMenuClick = onMenuClick,
+                onLoadMembers = {},
+                onGetReports = { _, _, start, end, force ->
+                    viewModel.getReports(start, end, force)
+                },
+                onGetTransactions = { _, _, start, end, force ->
+                    viewModel.getTransactions(start, end, force)
+                },
+                role = role
+            )
+        } else {
+            val viewModel: AdminReportViewModel = hiltViewModel()
+            val filterViewModel: com.sohitechnology.gymstudio.hammer.ui.member.MemberFilterViewModel = hiltViewModel()
+            val state by viewModel.state.collectAsState()
+            val clubs by filterViewModel.clubs.collectAsState()
+            
+            ReportTabContent(
+                state = state,
+                clubs = clubs,
+                navController = navController,
+                onMenuClick = onMenuClick,
+                onLoadMembers = { viewModel.loadMembers(it) },
+                onGetReports = { clubId, memberIds, start, end, force ->
+                    viewModel.getReports(clubId, memberIds, start, end, force)
+                },
+                onGetTransactions = { clubId, memberId, start, end, force ->
+                    viewModel.getTransactions(clubId, memberId, start, end, force)
+                },
+                role = role
+            )
+        }
     }
 
     composable(MainRoute.Notification.route) {
@@ -142,10 +200,20 @@ fun NavGraphBuilder.mainNavGraph(
     }
 
     composable(MainRoute.Profile.route) {
-        ProfileScreen(
-            navController = navController,
-            onMenuClick = onMenuClick,
-            biometricAuthenticator = biometricAuthenticator
-        )
+        val role by dataStore.read(SessionKeys.ROLE, "").collectAsState(initial = "")
+
+        if (role.lowercase() == "member") {
+            MemberProfileScreen(
+                navController = navController,
+                onMenuClick = onMenuClick,
+                biometricAuthenticator = biometricAuthenticator
+            )
+        } else {
+            AdminProfileScreen(
+                navController = navController,
+                onMenuClick = onMenuClick,
+                biometricAuthenticator = biometricAuthenticator
+            )
+        }
     }
 }

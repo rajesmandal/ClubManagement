@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.gson.Gson
 import com.sohitechnology.gymstudio.hammer.core.common.ApiResult
 import com.sohitechnology.gymstudio.hammer.core.network.ApiService
+import com.sohitechnology.gymstudio.hammer.core.network.UserApiService
 import com.sohitechnology.gymstudio.hammer.core.network.apiFlow
 import com.sohitechnology.gymstudio.hammer.core.session.AppDataStore
 import com.sohitechnology.gymstudio.hammer.core.util.DeviceUtil
@@ -25,6 +26,7 @@ import javax.inject.Inject
 
 class AuthRepository @Inject constructor(
     private val api: ApiService,
+    private val userApi: UserApiService,
     private val gson: Gson,
     @ApplicationContext private val context: Context,
     private val dataStore: AppDataStore
@@ -34,6 +36,13 @@ class AuthRepository @Inject constructor(
         return apiFlow(gson) {
             val deviceId = DeviceUtil.getOrCreateDeviceId(context, dataStore)
             api.login(request.copy(deviceId = deviceId))
+        }
+    }
+
+    fun memberLogin(request: LoginRequest): Flow<ApiResult<LoginResponse>> {
+        return apiFlow(gson) {
+            val deviceId = DeviceUtil.getOrCreateDeviceId(context, dataStore)
+            userApi.login(request.copy(deviceId = deviceId))
         }
     }
 

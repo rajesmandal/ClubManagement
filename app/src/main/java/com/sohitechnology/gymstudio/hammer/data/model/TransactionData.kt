@@ -8,5 +8,6 @@ data class TransactionData(
     val startDate: String? = null,
     val validity: String? = null,
     val validityType: String? = null,
-    val memberId: String? = null
+    val memberId: String? = null,
+    val paymentType: String? = null
 )

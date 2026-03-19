@@ -5,6 +5,7 @@ sealed class LoginEvent {
     data class CompanyIdChanged(val value: String) : LoginEvent()
     data class EmailChanged(val value: String) : LoginEvent()
     data class PasswordChanged(val value: String) : LoginEvent()
+    data class IsAdminChanged(val value: Boolean) : LoginEvent()
     object LoginClicked : LoginEvent()
 
 }

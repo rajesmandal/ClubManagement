@@ -58,6 +58,14 @@ class LoginViewModel @Inject constructor(
                 }
             }
 
+            is LoginEvent.IsAdminChanged -> {
+                _state.update {
+                    it.copy(
+                        isAdmin = event.value
+                    )
+                }
+            }
+
             LoginEvent.LoginClicked -> {
                 validateAndLogin() // trigger login flow
             }
@@ -93,14 +101,20 @@ class LoginViewModel @Inject constructor(
 
     private fun loginApiCall() {
         viewModelScope.launch {
-            repository.login(
-                LoginRequest(
-                    userName = state.value.username.trim(),
-                    password = state.value.password,
-                    cId = state.value.companyId.trim().toInt(),
-                    deviceId = ""
-                )
-            ).collect { result ->
+            val request = LoginRequest(
+                userName = state.value.username.trim(),
+                password = state.value.password,
+                cId = state.value.companyId.trim().toInt(),
+                deviceId = ""
+            )
+
+            val loginFlow = if (state.value.isAdmin) {
+                repository.login(request)
+            } else {
+                repository.memberLogin(request)
+            }
+
+            loginFlow.collect { result ->
 
                 when (result) {
 
@@ -151,7 +165,8 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    private suspend fun saveSession(data: LoginData) { //after login save details
+    private suspend fun saveSession(data: LoginData) {
+        //after login save details
         dataStore.save(SessionKeys.TOKEN, data.accessToken ?: "")
         dataStore.save(SessionKeys.USER_ID, data.userId ?: 0)
         dataStore.save(SessionKeys.IS_LOGGED_IN, true)

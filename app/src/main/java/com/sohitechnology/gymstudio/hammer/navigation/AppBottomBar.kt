@@ -36,14 +36,18 @@ import androidx.navigation.compose.rememberNavController
 import com.sohitechnology.gymstudio.hammer.ui.theme.ClubManagementTheme
 
 @Composable
-fun AppBottomBar(navController: NavHostController) {
-
-    val items = listOf(
-        BottomNavItem.Home,
-        BottomNavItem.Members,
-        BottomNavItem.Report,
-        BottomNavItem.Profile
-    )
+fun AppBottomBar(
+    navController: NavHostController,
+    role: String = "admin"
+) {
+    val items = remember(role) {
+        listOfNotNull(
+            BottomNavItem.Home,
+            if (role.lowercase() != "member") BottomNavItem.Members else null,
+            BottomNavItem.Report,
+            BottomNavItem.Profile
+        )
+    }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -158,7 +162,7 @@ fun AppBottomBarPreview() {
                 .padding(20.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
-            AppBottomBar(navController = navController)
+            AppBottomBar(navController = navController, role = "admin")
         }
     }
 }
@@ -176,7 +180,7 @@ fun AppBottomBarDarkPreview() {
                 .padding(20.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
-            AppBottomBar(navController = navController)
+            AppBottomBar(navController = navController, role = "admin")
         }
     }
 }

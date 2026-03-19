@@ -6,6 +6,7 @@ data class LoginState(
     val companyId: String = "",
     val username: String = "",
     val password: String = "",
+    val isAdmin: Boolean = true, // Default to Admin
     val companyIdError: String? = null,
     val usernameError: String? = null,
     val passwordError: String? = null,

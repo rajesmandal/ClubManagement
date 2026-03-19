@@ -3,9 +3,12 @@ package com.sohitechnology.gymstudio.hammer.data.repository
 import com.google.gson.Gson
 import com.sohitechnology.gymstudio.hammer.core.common.ApiResult
 import com.sohitechnology.gymstudio.hammer.core.network.ApiService
+import com.sohitechnology.gymstudio.hammer.core.network.UserApiService
 import com.sohitechnology.gymstudio.hammer.core.network.safeApiCall
 import com.sohitechnology.gymstudio.hammer.data.model.MemberCountRequest
 import com.sohitechnology.gymstudio.hammer.data.model.MemberCountResponse
+import com.sohitechnology.gymstudio.hammer.data.model.MemberDetailRequest
+import com.sohitechnology.gymstudio.hammer.data.model.MemberDetailResponse
 import com.sohitechnology.gymstudio.hammer.data.model.MemberExpiryRequest
 import com.sohitechnology.gymstudio.hammer.data.model.MemberExpiryResponse
 import com.sohitechnology.gymstudio.hammer.data.model.UpdateFcmTokenRequest
@@ -18,6 +21,7 @@ import javax.inject.Inject
 
 class HomeRepository @Inject constructor(
     private val api: ApiService,
+    private val userApi: UserApiService,
     private val gson: Gson
 ) {
     fun getMemberCount(request: MemberCountRequest): Flow<ApiResult<MemberCountResponse>> = flow {
@@ -38,6 +42,20 @@ class HomeRepository @Inject constructor(
         emit(ApiResult.Loading)
         emit(safeApiCall(gson) {
             api.updateFcmToken(request)
+        })
+    }.flowOn(Dispatchers.IO)
+
+    fun memberUpdateFcmToken(request: UpdateFcmTokenRequest): Flow<ApiResult<UpdateFcmTokenResponse>> = flow {
+        emit(ApiResult.Loading)
+        emit(safeApiCall(gson) {
+            userApi.updateFcmToken(request)
+        })
+    }.flowOn(Dispatchers.IO)
+
+    fun getMemberById(request: MemberDetailRequest): Flow<ApiResult<MemberDetailResponse>> = flow {
+        emit(ApiResult.Loading)
+        emit(safeApiCall(gson) {
+            userApi.getById(request)
         })
     }.flowOn(Dispatchers.IO)
 }

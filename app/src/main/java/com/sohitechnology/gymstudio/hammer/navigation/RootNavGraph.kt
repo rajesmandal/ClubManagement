@@ -5,13 +5,15 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
+import com.sohitechnology.gymstudio.hammer.core.session.AppDataStore
 import com.sohitechnology.gymstudio.hammer.main.MainContainerScreen
 import com.sohitechnology.gymstudio.hammer.ui.auth.BiometricAuthenticator
 
 @Composable
 fun RootNavGraph(
     navController: NavHostController,
-    biometricAuthenticator: BiometricAuthenticator
+    biometricAuthenticator: BiometricAuthenticator,
+    dataStore: AppDataStore
 ) {
 
     NavHost(
@@ -28,7 +30,8 @@ fun RootNavGraph(
 
         composable(RootRoute.Main.route) {
             MainContainerScreen(
-                biometricAuthenticator = biometricAuthenticator
+                biometricAuthenticator = biometricAuthenticator,
+                dataStore = dataStore
             )
         }
     }

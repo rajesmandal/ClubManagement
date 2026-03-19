@@ -10,24 +10,13 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -37,6 +26,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.sohitechnology.gymstudio.hammer.data.model.MemberCountData
+import com.sohitechnology.gymstudio.hammer.data.model.MemberDetailData
 import com.sohitechnology.gymstudio.hammer.navigation.AppBottomBar
 import com.sohitechnology.gymstudio.hammer.navigation.MainRoute
 import com.sohitechnology.gymstudio.hammer.ui.common.AppTopBar
@@ -62,6 +52,9 @@ fun HomeScreen(
     
     val expiryMembers by viewModel.expiryMembers.collectAsState()
     val isExpiryLoading by viewModel.isExpiryLoading.collectAsState()
+    
+    val isAdmin by viewModel.isAdmin.collectAsState()
+    val memberDetail by viewModel.memberDetail.collectAsState()
 
     // Permission Request Logic
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -88,13 +81,10 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.getMemberCount()
-        viewModel.getMemberExpiry()
-    }
-
     HomeContent(
+        isAdmin = isAdmin,
         memberCount = memberCount,
+        memberDetail = memberDetail,
         isLoading = isLoading,
         error = error,
         expiryMembers = expiryMembers,
@@ -104,14 +94,17 @@ fun HomeScreen(
         onMemberClick = onMemberClick,
         onReload = { viewModel.reloadAll() },
         sharedTransitionScope = sharedTransitionScope,
-        animatedVisibilityScope = animatedVisibilityScope
+        animatedVisibilityScope = animatedVisibilityScope,
+        role = if (isAdmin) "admin" else "member"
     )
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun HomeContent(
+    isAdmin: Boolean,
     memberCount: MemberCountData?,
+    memberDetail: MemberDetailData?,
     isLoading: Boolean,
     error: String?,
     expiryMembers: List<MemberUiModel>,
@@ -121,7 +114,8 @@ fun HomeContent(
     onMemberClick: (MemberUiModel) -> Unit,
     onReload: () -> Unit,
     sharedTransitionScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    role: String
 ) {
     Scaffold(
         topBar = {
@@ -135,7 +129,8 @@ fun HomeContent(
         },
         bottomBar = {
             AppBottomBar(
-                navController
+                navController,
+                role = role
             )
         }
     ) { paddingValues ->
@@ -144,9 +139,9 @@ fun HomeContent(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (isLoading && memberCount == null) {
+            if (isLoading && memberCount == null && memberDetail == null) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (error != null && memberCount == null) {
+            } else if (error != null && memberCount == null && memberDetail == null) {
                 Text(
                     text = error ?: "Unknown Error",
                     color = MaterialTheme.colorScheme.error,
@@ -159,251 +154,64 @@ fun HomeContent(
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp)
                 ) {
-                    memberCount?.let { data ->
-                        MemberCountCard(data, onReload, isLoading)
-                    }
-                    
-                    Spacer(modifier = Modifier.height(24.dp))
-                    
-                    Text(
-                        text = "Upcoming Expiries",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(start = 8.dp, bottom = 12.dp)
-                    )
-                    
-                    if (isExpiryLoading && expiryMembers.isEmpty()) {
-                        Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(modifier = Modifier.size(30.dp))
+                    if (isAdmin) {
+                        memberCount?.let { data ->
+                            MemberCountCard(data, onReload, isLoading)
                         }
-                    } else if (expiryMembers.isEmpty()) {
-                        EmptyState(
-                            modifier = Modifier.fillMaxWidth().height(200.dp),
-                            title = "No Expiries Soon",
-                            description = "No members are expiring in the near future."
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        Text(
+                            text = "Upcoming Expiries",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(start = 8.dp, bottom = 12.dp)
                         )
+                        
+                        if (isExpiryLoading && expiryMembers.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(modifier = Modifier.size(30.dp))
+                            }
+                        } else if (expiryMembers.isEmpty()) {
+                            EmptyState(
+                                modifier = Modifier.fillMaxWidth().height(200.dp),
+                                title = "No Expiries Soon",
+                                description = "No members are expiring in the near future."
+                            )
+                        } else {
+                            expiryMembers.forEach { member ->
+                                MemberItem(
+                                    member = member,
+                                    onClick = { onMemberClick(member) },
+                                    sharedTransitionScope = sharedTransitionScope,
+                                    animatedVisibilityScope = animatedVisibilityScope
+                                )
+                            }
+                        }
                     } else {
-                        expiryMembers.forEach { member ->
-                            MemberItem(
-                                member = member,
-                                onClick = { onMemberClick(member) },
-                                sharedTransitionScope = sharedTransitionScope,
-                                animatedVisibilityScope = animatedVisibilityScope
+                        // Member UI
+                        memberDetail?.let { data ->
+                            MemberDashboardCard(data, onReload, isLoading)
+                            
+                            Spacer(modifier = Modifier.height(24.dp))
+                            
+                            Text(
+                                text = "Your Current Plan",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(start = 8.dp, bottom = 12.dp)
+                            )
+                            
+                            data.getMemberTransaction?.firstOrNull()?.let { transaction ->
+                                PlanDetailsCard(transaction)
+                            } ?: EmptyState(
+                                title = "No Active Plan",
+                                description = "Please contact your club to renew your membership."
                             )
                         }
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun MemberCountCard(data: MemberCountData, onReload: () -> Unit, isLoading: Boolean) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
-        border = BorderStroke(0.5.dp, Color.Gray.copy(alpha = 0.2f))
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = 24.dp, horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Member Statistics",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-                Surface(onClick = onReload,modifier = Modifier.align(Alignment.CenterEnd).size(36.dp), shape = RoundedCornerShape(50.dp), color = MaterialTheme.colorScheme.background,  enabled = !isLoading) {
-                    Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.padding(8.dp), tint = MaterialTheme.colorScheme.onSurface)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(140.dp)) {
-                    DonutChart(
-                        data = data,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = (data.all ?: 0).toString(),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Black,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "TOTAL",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier
-                        .padding(start = 16.dp)
-                        .weight(1f)
-                        .align(Alignment.CenterVertically)
-                ) {
-                    LegendItem(
-                        color = Color(0xFF10B981), 
-                        label = "Active", 
-                        count = data.active ?: 0,
-                        gradient = Brush.linearGradient(listOf(Color(0xFF34D399), Color(0xFF10B981)))
-                    )
-                    LegendItem(
-                        color = Color(0xFF6B7280), 
-                        label = "Deactive", 
-                        count = data.deactive ?: 0,
-                        gradient = Brush.linearGradient(listOf(Color(0xFF9CA3AF), Color(0xFF6B7280)))
-                    )
-                    LegendItem(
-                        color = Color(0xFFEF4444), 
-                        label = "Expired", 
-                        count = data.expired ?: 0,
-                        gradient = Brush.linearGradient(listOf(Color(0xFFF87171), Color(0xFFEF4444)))
-                    )
-                    LegendItem(
-                        color = Color(0xFF3B82F6), 
-                        label = "Today Renew", 
-                        count = data.todayRenew ?: 0,
-                        gradient = Brush.linearGradient(listOf(Color(0xFF60A5FA), Color(0xFF3B82F6)))
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun DonutChart(data: MemberCountData, modifier: Modifier = Modifier) {
-    val total = (data.all ?: 0).toFloat()
-    
-    val activeAngle = if (total > 0) ((data.active ?: 0) / total) * 360f else 0f
-    val deactiveAngle = if (total > 0) ((data.deactive ?: 0) / total) * 360f else 0f
-    val expiredAngle = if (total > 0) ((data.expired ?: 0) / total) * 360f else 0f
-    val todayRenewAngle = if (total > 0) ((data.todayRenew ?: 0) / total) * 360f else 0f
-
-    Canvas(modifier = modifier) {
-        val strokeWidth = 14.dp.toPx()
-        val trackColor = Color.Gray.copy(alpha = 0.1f)
-        
-        // Background Track
-        drawCircle(
-            color = trackColor,
-            style = Stroke(width = strokeWidth),
-            radius = size.minDimension / 2 - strokeWidth / 2
-        )
-
-        var currentStartAngle = -90f
-        
-        // Active Arc
-        if (activeAngle > 0) {
-            drawArc(
-                brush = Brush.sweepGradient(
-                    0.0f to Color(0xFF34D399),
-                    1.0f to Color(0xFF10B981)
-                ),
-                startAngle = currentStartAngle,
-                sweepAngle = activeAngle,
-                useCenter = false,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-            currentStartAngle += activeAngle
-        }
-        
-        // Deactive Arc
-        if (deactiveAngle > 0) {
-            drawArc(
-                brush = Brush.sweepGradient(
-                    0.0f to Color(0xFF9CA3AF),
-                    1.0f to Color(0xFF6B7280)
-                ),
-                startAngle = currentStartAngle,
-                sweepAngle = deactiveAngle,
-                useCenter = false,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-            currentStartAngle += deactiveAngle
-        }
-        
-        // Expired Arc
-        if (expiredAngle > 0) {
-            drawArc(
-                brush = Brush.sweepGradient(
-                    0.0f to Color(0xFFF87171),
-                    1.0f to Color(0xFFEF4444)
-                ),
-                startAngle = currentStartAngle,
-                sweepAngle = expiredAngle,
-                useCenter = false,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-            currentStartAngle += expiredAngle
-        }
-
-        // Today Renew Arc
-        if (todayRenewAngle > 0) {
-            drawArc(
-                brush = Brush.sweepGradient(
-                    0.0f to Color(0xFF60A5FA),
-                    1.0f to Color(0xFF3B82F6)
-                ),
-                startAngle = currentStartAngle,
-                sweepAngle = todayRenewAngle,
-                useCenter = false,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-        }
-    }
-}
-
-@Composable
-fun LegendItem(color: Color, label: String, count: Int, gradient: Brush) {
-    Surface(
-        color = color.copy(alpha = 0.05f),
-        shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .background(gradient, CircleShape)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                text = count.toString(),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
@@ -440,26 +248,6 @@ fun HomeScreenPreview() {
             nationality = "Indian",
             startDate = "01-01-2024",
             expiryDate = "01-02-2024"
-        ),
-        MemberUiModel(
-            id = 2,
-            memberId = "M002",
-            name = "Jane Smith",
-            userName = "janesmith",
-            password = "",
-            image = "",
-            status = "Expired",
-            gender = "Female",
-            contactNo = "0987654321",
-            emailId = "jane@example.com",
-            clubName = "Secondary Club",
-            clubId = 2,
-            birthDay = "05-05-1995",
-            hireDay = "15-05-2022",
-            address = "456 Avenue",
-            nationality = "Indian",
-            startDate = "01-01-2023",
-            expiryDate = "01-01-2024"
         )
     )
 
@@ -467,7 +255,9 @@ fun HomeScreenPreview() {
         SharedTransitionLayout {
             AnimatedVisibility(visible = true) {
                 HomeContent(
+                    isAdmin = true,
                     memberCount = mockMemberCount,
+                    memberDetail = null,
                     isLoading = false,
                     error = null,
                     expiryMembers = mockExpiryMembers,
@@ -477,7 +267,8 @@ fun HomeScreenPreview() {
                     onMemberClick = {},
                     onReload = {},
                     sharedTransitionScope = this@SharedTransitionLayout,
-                    animatedVisibilityScope = this@AnimatedVisibility
+                    animatedVisibilityScope = this@AnimatedVisibility,
+                    role = "admin"
                 )
             }
         }

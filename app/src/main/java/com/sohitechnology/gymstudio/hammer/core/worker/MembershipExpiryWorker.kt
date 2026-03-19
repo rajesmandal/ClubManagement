@@ -33,6 +33,13 @@ class MembershipExpiryWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         Log.d(TAG, "Worker started...")
         
+        val role = dataStore.readOnce(SessionKeys.ROLE, "").lowercase()
+        // Strictly only run for admin or staff roles
+        if (role != "admin" && role != "staff" && role != "employee") {
+            Log.d(TAG, "User role is '$role', skipping admin expiry check.")
+            return Result.success()
+        }
+
         val companyId = dataStore.readOnce(SessionKeys.COMPANY_ID, "0").toIntOrNull() ?: 0
         Log.d(TAG, "Company ID: $companyId")
         

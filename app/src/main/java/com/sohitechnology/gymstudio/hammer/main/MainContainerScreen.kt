@@ -52,11 +52,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.sohitechnology.gymstudio.hammer.R
 import com.sohitechnology.gymstudio.hammer.core.NavigationEvent
 import com.sohitechnology.gymstudio.hammer.core.NavigationManager
+import com.sohitechnology.gymstudio.hammer.core.session.AppDataStore
+import com.sohitechnology.gymstudio.hammer.core.session.SessionKeys
 import com.sohitechnology.gymstudio.hammer.navigation.BottomNavItem
 import com.sohitechnology.gymstudio.hammer.navigation.MainRoute
 import com.sohitechnology.gymstudio.hammer.navigation.mainNavGraph
@@ -71,7 +74,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun MainContainerScreen(
     viewModel: MainViewModel = hiltViewModel(),
-    biometricAuthenticator: BiometricAuthenticator
+    biometricAuthenticator: BiometricAuthenticator,
+    dataStore: AppDataStore
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -79,6 +83,7 @@ fun MainContainerScreen(
     val context = LocalContext.current
 
     val themeMode by viewModel.themeMode.collectAsState()
+    val role by dataStore.read(SessionKeys.ROLE, "").collectAsState(initial = "")
     
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -89,7 +94,7 @@ fun MainContainerScreen(
     LaunchedEffect(Unit) {
         NavigationManager.events.collect { event ->
             if (event == NavigationEvent.ToLogin) {
-                // Handle navigation to login if needed, or rely on RootNavGraph
+                // Handle navigation to login if needed
             }
         }
     }
@@ -116,12 +121,12 @@ fun MainContainerScreen(
         showLogoutPopup = showLogoutPopup,
         versionName = versionName,
         versionCode = versionCode,
+        role = role,
         onLogoutPopupToggle = { showLogoutPopup = it },
         onThemeToggle = { viewModel.setThemeMode(if (it) "dark" else "light") },
         onLogoutConfirm = { viewModel.logout() },
         onNavItemClick = { route ->
             scope.launch { drawerState.close() }
-            // To allow back navigation, we just navigate without popping up to the start destination
             navController.navigate(route) {
                 if (route == BottomNavItem.Home.route) {
                     popUpTo(navController.graph.startDestinationId) {
@@ -133,7 +138,7 @@ fun MainContainerScreen(
         },
         navHost = {
             SharedTransitionLayout {
-                androidx.navigation.compose.NavHost(
+                NavHost(
                     navController = navController,
                     startDestination = MainRoute.MemberGraph.route
                 ) {
@@ -147,7 +152,8 @@ fun MainContainerScreen(
                             }
                         },
                         sharedTransitionScope = this@SharedTransitionLayout,
-                        biometricAuthenticator = biometricAuthenticator
+                        biometricAuthenticator = biometricAuthenticator,
+                        dataStore = dataStore
                     )
                 }
             }
@@ -164,13 +170,13 @@ fun MainContainerContent(
     showLogoutPopup: Boolean,
     versionName: String,
     versionCode: Long,
+    role: String,
     onLogoutPopupToggle: (Boolean) -> Unit,
     onThemeToggle: (Boolean) -> Unit,
     onLogoutConfirm: () -> Unit,
     onNavItemClick: (String) -> Unit,
     navHost: @Composable () -> Unit
 ) {
-    // Determine if we are currently in dark mode (considering system setting)
     val isSystemDark = isSystemInDarkTheme()
     val isCurrentDark = when (themeMode) {
         "light" -> false
@@ -178,19 +184,21 @@ fun MainContainerContent(
         else -> isSystemDark
     }
 
-    val sideBarItems = listOf(
-        BottomNavItem.Home,
-        BottomNavItem.Members,
-        BottomNavItem.Report,
-        BottomNavItem.Notification,
-        BottomNavItem.Profile
-    )
+    // Hide Members for members as requested
+    val sideBarItems = remember(role) {
+        listOfNotNull(
+            BottomNavItem.Home,
+            if (role.lowercase() != "member") BottomNavItem.Members else null,
+            BottomNavItem.Report,
+            BottomNavItem.Notification,
+            BottomNavItem.Profile
+        )
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet {
-                // Header with Logo and Title
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -238,7 +246,6 @@ fun MainContainerContent(
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-                // Footer Section: Theme Switcher
                 Row(
                     modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -263,7 +270,6 @@ fun MainContainerContent(
                     )
                 }
 
-                // Footer Section: Version Info
                 Text(
                     text = "Version $versionName ($versionCode)",
                     modifier = Modifier
@@ -304,30 +310,5 @@ fun MainContainerContent(
                 )
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun MainContainerScreenPreview() {
-    ClubManagementTheme {
-        MainContainerContent(
-            drawerState = rememberDrawerState(initialValue = DrawerValue.Open),
-            themeMode = "system",
-            isLogoutLoading = false,
-            currentRoute = BottomNavItem.Home.route,
-            showLogoutPopup = false,
-            versionName = "1.0",
-            versionCode = 1L,
-            onLogoutPopupToggle = {},
-            onThemeToggle = {},
-            onLogoutConfirm = {},
-            onNavItemClick = {},
-            navHost = {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Main Content Area")
-                }
-            }
-        )
     }
 }

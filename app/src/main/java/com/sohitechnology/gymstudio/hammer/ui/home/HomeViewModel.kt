@@ -9,6 +9,8 @@ import com.sohitechnology.gymstudio.hammer.core.session.SessionKeys
 import com.sohitechnology.gymstudio.hammer.data.cache.HomeCache
 import com.sohitechnology.gymstudio.hammer.data.model.MemberCountData
 import com.sohitechnology.gymstudio.hammer.data.model.MemberCountRequest
+import com.sohitechnology.gymstudio.hammer.data.model.MemberDetailData
+import com.sohitechnology.gymstudio.hammer.data.model.MemberDetailRequest
 import com.sohitechnology.gymstudio.hammer.data.model.MemberExpiryRequest
 import com.sohitechnology.gymstudio.hammer.data.model.UpdateFcmTokenRequest
 import com.sohitechnology.gymstudio.hammer.data.repository.HomeRepository
@@ -41,13 +43,35 @@ class HomeViewModel @Inject constructor(
     private val _isExpiryLoading = MutableStateFlow(false)
     val isExpiryLoading = _isExpiryLoading.asStateFlow()
 
+    private val _isAdmin = MutableStateFlow(true)
+    val isAdmin = _isAdmin.asStateFlow()
+
+    private val _memberDetail = MutableStateFlow<MemberDetailData?>(null)
+    val memberDetail = _memberDetail.asStateFlow()
+
     init {
-        // Load from cache initially if available
-        HomeCache.memberCount?.let { _memberCount.value = it }
-        HomeCache.expiryMembers?.let { _expiryMembers.value = it }
-        
-        // Update FCM Token on home screen launch
-        updateFcmToken()
+        checkRoleAndInit()
+    }
+
+    private fun checkRoleAndInit() {
+        viewModelScope.launch {
+            val role = dataStore.readOnce(SessionKeys.ROLE, "").lowercase()
+            val isMemberRole = role == "member"
+            _isAdmin.value = !isMemberRole
+
+            // Load from cache initially if available
+            HomeCache.memberCount?.let { _memberCount.value = it }
+            HomeCache.expiryMembers?.let { _expiryMembers.value = it }
+
+            if (isMemberRole) {
+                updateMemberFcmToken()
+                getMemberDetail()
+            } else {
+                updateFcmToken()
+                getMemberCount()
+                getMemberExpiry()
+            }
+        }
     }
 
     private fun updateFcmToken() {
@@ -73,7 +97,61 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun updateMemberFcmToken() {
+        viewModelScope.launch {
+            try {
+                val fcmToken = FirebaseMessaging.getInstance().token.await()
+                val companyIdStr = dataStore.readOnce(SessionKeys.COMPANY_ID, "0")
+                val companyId = companyIdStr.toIntOrNull() ?: 0
+                val userId = dataStore.readOnce(SessionKeys.USER_ID, 0)
+
+                if (fcmToken.isNotEmpty() && userId != 0 && companyId != 0) {
+                    homeRepository.memberUpdateFcmToken(
+                        UpdateFcmTokenRequest(
+                            cId = companyId,
+                            fcmToken = fcmToken,
+                            userId = userId
+                        )
+                    ).collect { /* No action needed for response */ }
+                }
+            } catch (e: Exception) {
+                // Silently fail
+            }
+        }
+    }
+
+    private fun getMemberDetail() {
+        viewModelScope.launch {
+            val companyIdStr = dataStore.readOnce(SessionKeys.COMPANY_ID, "0")
+            val companyId = companyIdStr.toIntOrNull() ?: 0
+            val userId = dataStore.readOnce(SessionKeys.USER_ID, 0)
+
+            if (companyId != 0 && userId != 0) {
+                homeRepository.getMemberById(MemberDetailRequest(cId = companyId, id = userId)).collect { result ->
+                    when (result) {
+                        is ApiResult.Loading -> _isLoading.value = true
+                        is ApiResult.Success -> {
+                            _isLoading.value = false
+                            val memberData = result.data.data?.firstOrNull()
+                            _memberDetail.value = memberData
+                            
+                            // Save clubId to local storage
+                            memberData?.clubId?.let {
+                                dataStore.save(SessionKeys.CLUB_ID, it)
+                            }
+                        }
+                        is ApiResult.Error -> {
+                            _isLoading.value = false
+                            _error.value = result.message
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fun getMemberCount(forceRefresh: Boolean = false) {
+        if (!_isAdmin.value) return
         // Only skip if not forced and data exists in cache
         if (!forceRefresh && HomeCache.memberCount != null) {
             _memberCount.value = HomeCache.memberCount
@@ -105,6 +183,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun getMemberExpiry(forceRefresh: Boolean = false) {
+        if (!_isAdmin.value) return
         // Only skip if not forced and data exists in cache
         if (!forceRefresh && HomeCache.expiryMembers != null) {
             _expiryMembers.value = HomeCache.expiryMembers!!
@@ -155,7 +234,11 @@ class HomeViewModel @Inject constructor(
     }
 
     fun reloadAll() {
-        getMemberCount(forceRefresh = true)
-        getMemberExpiry(forceRefresh = true)
+        if (_isAdmin.value) {
+            getMemberCount(forceRefresh = true)
+            getMemberExpiry(forceRefresh = true)
+        } else {
+            getMemberDetail()
+        }
     }
 }

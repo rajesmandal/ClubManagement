@@ -27,6 +27,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -39,6 +42,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.navigation.compose.rememberNavController
 import com.sohitechnology.gymstudio.hammer.core.NavigationEvent
 import com.sohitechnology.gymstudio.hammer.core.NavigationManager
+import com.sohitechnology.gymstudio.hammer.core.session.AppDataStore
 import com.sohitechnology.gymstudio.hammer.main.MainViewModel
 import com.sohitechnology.gymstudio.hammer.navigation.AuthRoute
 import com.sohitechnology.gymstudio.hammer.navigation.MainRoute
@@ -56,6 +60,9 @@ class MainActivity : FragmentActivity() {
 
     @Inject
     lateinit var biometricAuthenticator: BiometricAuthenticator
+
+    @Inject
+    lateinit var dataStore: AppDataStore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -135,7 +142,8 @@ class MainActivity : FragmentActivity() {
 
                     RootNavGraph(
                         navController = navController,
-                        biometricAuthenticator = biometricAuthenticator
+                        biometricAuthenticator = biometricAuthenticator,
+                        dataStore = dataStore
                     )
 
                     if (isLoggedIn == true && isAppLockEnabled && isAppLocked) {

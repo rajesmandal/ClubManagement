@@ -8,58 +8,51 @@ import androidx.lifecycle.viewModelScope
 import com.sohitechnology.gymstudio.hammer.core.common.ApiResult
 import com.sohitechnology.gymstudio.hammer.core.session.AppDataStore
 import com.sohitechnology.gymstudio.hammer.core.session.SessionKeys
-import com.sohitechnology.gymstudio.hammer.data.repository.AuthRepository
 import com.sohitechnology.gymstudio.hammer.data.model.LogoutRequest
+import com.sohitechnology.gymstudio.hammer.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val dataStore: AppDataStore,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val dataStore: AppDataStore
 ) : ViewModel() {
 
-    val themeMode: StateFlow<String> = dataStore.read(SessionKeys.THEME_MODE, "system")
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "system")
+    private val _themeMode = MutableStateFlow("system")
+    val themeMode = _themeMode.asStateFlow()
 
-    val isLoggedIn: StateFlow<Boolean?> = dataStore.read(SessionKeys.IS_LOGGED_IN, false)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    private val _isAppLocked = MutableStateFlow(false)
+    val isAppLocked = _isAppLocked.asStateFlow()
+
+    val isLoggedIn: StateFlow<Boolean> = dataStore.read(SessionKeys.IS_LOGGED_IN, false)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val isAppLockEnabled: StateFlow<Boolean> = dataStore.read(SessionKeys.IS_APP_LOCK_ENABLED, false)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
-    // Initial state is true. On cold start, this stays true.
-    private val _isAppLocked = MutableStateFlow(true)
-    val isAppLocked = _isAppLocked.asStateFlow()
-
-    private val _logoutEvent = MutableSharedFlow<Unit>()
-    val logoutEvent = _logoutEvent.asSharedFlow()
 
     var isLogoutLoading by mutableStateOf(false)
         private set
 
     init {
         viewModelScope.launch {
-            // Monitor login state transitions
-            isLoggedIn.collect { loggedIn ->
-                if (loggedIn == false) {
-                    _isAppLocked.value = false
-                }
+            _themeMode.value = dataStore.readOnce(SessionKeys.THEME_MODE, "system")
+            // Initialize app lock state if enabled
+            if (dataStore.readOnce(SessionKeys.IS_APP_LOCK_ENABLED, false)) {
+                _isAppLocked.value = true
             }
         }
     }
 
     fun setThemeMode(mode: String) {
         viewModelScope.launch {
+            _themeMode.value = mode
             dataStore.save(SessionKeys.THEME_MODE, mode)
         }
     }
@@ -70,18 +63,23 @@ class MainViewModel @Inject constructor(
 
     fun logout() {
         viewModelScope.launch {
-            isLogoutLoading = true
-            val companyId = dataStore.read(SessionKeys.COMPANY_ID, "").first()
-            authRepository.logout(LogoutRequest(companyId.toIntOrNull() ?: 0)).collect { result ->
+            val companyIdStr = dataStore.readOnce(SessionKeys.COMPANY_ID, "0")
+            val companyId = companyIdStr.toIntOrNull() ?: 0
+            val userId = dataStore.readOnce(SessionKeys.USER_ID, 0)
+
+            authRepository.logout(LogoutRequest(cId = companyId, userId = userId)).collect { result ->
                 when (result) {
-                    is ApiResult.Success<*>, is ApiResult.Error -> {
-                        dataStore.clear()
+                    is ApiResult.Loading -> isLogoutLoading = true
+                    is ApiResult.Success -> {
                         isLogoutLoading = false
-                        setAppLocked(false)
-                        _logoutEvent.emit(Unit)
+                        dataStore.clear()
+                        com.sohitechnology.gymstudio.hammer.core.NavigationManager.navigate(com.sohitechnology.gymstudio.hammer.core.NavigationEvent.ToLogin)
                     }
-                    is ApiResult.Loading -> {
-                        isLogoutLoading = true
+                    is ApiResult.Error -> {
+                        isLogoutLoading = false
+                        // Even if API fails, clear local data and navigate to login
+                        dataStore.clear()
+                        com.sohitechnology.gymstudio.hammer.core.NavigationManager.navigate(com.sohitechnology.gymstudio.hammer.core.NavigationEvent.ToLogin)
                     }
                 }
             }
